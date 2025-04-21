@@ -1,0 +1,124 @@
+
+-- Tabela de Pacientes
+CREATE TABLE PACIENTE (
+  CPF VARCHAR(11) PRIMARY KEY,
+  Nome VARCHAR(100),
+  Telefone VARCHAR(15),
+  Codigo_Credenciamento INT
+);
+
+-- Tabela de Médicos
+CREATE TABLE MEDICO (
+  CRM VARCHAR(20) PRIMARY KEY,
+  Nome VARCHAR(100),
+  Telefone VARCHAR(15),
+  Codigo_Credenciamento INT
+);
+
+-- Especialidades do Médico (multivalorado)
+CREATE TABLE ESPECIALIDADE_MEDICO (
+  ID SERIAL PRIMARY KEY,
+  CRM_Medico VARCHAR(20),
+  Especialidade VARCHAR(50),
+  FOREIGN KEY (CRM_Medico) REFERENCES MEDICO(CRM)
+);
+
+-- Tabela de Consultas
+CREATE TABLE CONSULTA (
+  Codigo SERIAL PRIMARY KEY,
+  Data DATE,
+  Hora TIME,
+  Status VARCHAR(20),
+  CRM_Medico VARCHAR(20),
+  CPF_Paciente VARCHAR(11),
+  FOREIGN KEY (CRM_Medico) REFERENCES MEDICO(CRM),
+  FOREIGN KEY (CPF_Paciente) REFERENCES PACIENTE(CPF)
+);
+
+-- Tabela de Prontuários
+CREATE TABLE PRONTUARIO (
+  ID SERIAL PRIMARY KEY,
+  Diagnostico TEXT,
+  Prescricao TEXT,
+  Consulta_Codigo INT UNIQUE,
+  FOREIGN KEY (Consulta_Codigo) REFERENCES CONSULTA(Codigo)
+);
+
+-- Tabela de Exames
+CREATE TABLE EXAME (
+  ID SERIAL PRIMARY KEY,
+  Nome_Exame VARCHAR(100),
+  Resultado TEXT,
+  Prontuario_ID INT,
+  FOREIGN KEY (Prontuario_ID) REFERENCES PRONTUARIO(ID)
+);
+
+-- Tabela de Planos de Saúde
+CREATE TABLE PLANO_DE_SAUDE (
+  Codigo INT PRIMARY KEY,
+  Nome VARCHAR(100),
+  Telefone VARCHAR(15),
+  Operadora VARCHAR(100)
+);
+
+-- Tabela de Enfermeiras
+CREATE TABLE ENFERMEIRA (
+  CRE VARCHAR(20) PRIMARY KEY,
+  Primeiro_Nome VARCHAR(50),
+  Sobrenome VARCHAR(50),
+  Enfermeira_Chefe VARCHAR(20),
+  FOREIGN KEY (Enfermeira_Chefe) REFERENCES ENFERMEIRA(CRE)
+);
+
+-- Tabela de Setores
+CREATE TABLE SETOR (
+  Codigo INT PRIMARY KEY,
+  Descricao VARCHAR(100),
+  Tipo VARCHAR(30),
+  Qtd_Leitos INT,
+  Classificacao_Risco VARCHAR(30),
+  Nome_Responsavel VARCHAR(100),
+  Nome_Acompanhante VARCHAR(100)
+);
+
+-- Relacionamento entre Setores e Enfermeiras
+CREATE TABLE SETOR_ENFERMEIRA (
+  ID SERIAL PRIMARY KEY,
+  Setor_Codigo INT,
+  Enfermeira_CRE VARCHAR(20),
+  FOREIGN KEY (Setor_Codigo) REFERENCES SETOR(Codigo),
+  FOREIGN KEY (Enfermeira_CRE) REFERENCES ENFERMEIRA(CRE)
+);
+
+-- Tabela de Hospitais
+CREATE TABLE HOSPITAL (
+  CNPJ VARCHAR(18) PRIMARY KEY,
+  Nome VARCHAR(100)
+);
+
+-- Relação entre Hospital e Médico
+CREATE TABLE HOSPITAL_MEDICO (
+  ID SERIAL PRIMARY KEY,
+  Hospital_CNPJ VARCHAR(18),
+  Medico_CRM VARCHAR(20),
+  FOREIGN KEY (Hospital_CNPJ) REFERENCES HOSPITAL(CNPJ),
+  FOREIGN KEY (Medico_CRM) REFERENCES MEDICO(CRM)
+);
+
+-- Relação entre Hospital e Setor
+CREATE TABLE HOSPITAL_SETOR (
+  ID SERIAL PRIMARY KEY,
+  Hospital_CNPJ VARCHAR(18),
+  Setor_Codigo INT,
+  FOREIGN KEY (Hospital_CNPJ) REFERENCES HOSPITAL(CNPJ),
+  FOREIGN KEY (Setor_Codigo) REFERENCES SETOR(Codigo)
+);
+
+-- Relação N:N entre Paciente e Médico
+CREATE TABLE PACIENTE_MEDICO (
+  ID SERIAL PRIMARY KEY,
+  CPF_Paciente VARCHAR(11),
+  CRM_Medico VARCHAR(20),
+  FOREIGN KEY (CPF_Paciente) REFERENCES PACIENTE(CPF),
+  FOREIGN KEY (CRM_Medico) REFERENCES MEDICO(CRM)
+);
