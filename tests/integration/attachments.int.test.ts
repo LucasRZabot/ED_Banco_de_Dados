@@ -16,11 +16,12 @@ const pdf = Buffer.from(`%PDF-1.4\n% teste ${run}\n%%EOF\n`);
 let sectorA: string;
 let sectorB: string;
 let admin: CurrentUser;
+let financeiro: CurrentUser;
 let chefiaA: CurrentUser;
 let chefiaB: CurrentUser;
 let ticketId: string;
 
-async function makeUser(role: "ADMIN" | "REQUESTER", sectorId: string): Promise<CurrentUser> {
+async function makeUser(role: "ADMIN" | "FINANCEIRO" | "REQUESTER", sectorId: string): Promise<CurrentUser> {
   const u = await db.user.create({
     data: { email: `${role.toLowerCase()}-${randomUUID()}@teste.local`, role, sectorId, mustChangePassword: false },
   });
@@ -51,8 +52,10 @@ beforeAll(async () => {
   sectorA = (await db.sector.create({ data: { name: `Setor A ${run}`, costCenter: `TA-${run}` } })).id;
   sectorB = (await db.sector.create({ data: { name: `Setor B ${run}`, costCenter: `TB-${run}` } })).id;
   admin = await makeUser("ADMIN", sectorA);
+  financeiro = await makeUser("FINANCEIRO", sectorA);
   chefiaA = await makeUser("REQUESTER", sectorA);
-  chefiaB = await makeUser("REQUESTER", sectorB);
+  // Mesmo setor da chefia A, para provar que a visibilidade é por autor e não por setor.
+  chefiaB = await makeUser("REQUESTER", sectorA);
   ticketId = (
     await db.ticket.create({
       data: {
@@ -68,24 +71,27 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.attachment.deleteMany({ where: { ticketId } });
-  await db.ticket.deleteMany({ where: { id: ticketId } });
-  await db.user.deleteMany({ where: { id: { in: [admin.id, chefiaA.id, chefiaB.id] } } });
+  const ids = [admin.id, financeiro.id, chefiaA.id, chefiaB.id];
+  await db.attachment.deleteMany({ where: { uploadedById: { in: ids } } });
+  await db.invoice.deleteMany({ where: { submittedById: { in: ids } } });
+  await db.ticket.deleteMany({ where: { requesterId: { in: [chefiaA.id, chefiaB.id] } } });
+  await db.user.deleteMany({ where: { id: { in: ids } } });
   await db.sector.deleteMany({ where: { id: { in: [sectorA, sectorB] } } });
   await db.$disconnect();
 });
 
 describe("anexos com S3 presigned", () => {
-  it("grava o anexo, controla acesso por setor e baixa o arquivo", async () => {
+  it("grava o anexo, libera só para o autor e para o financeiro, e baixa o arquivo", async () => {
     const { key, token } = await uploadTicketPdf(chefiaA.id);
     const att = await attachUploadedFile(token, chefiaA, { ticketId }, ["TICKET"]);
 
     expect(att).toMatchObject({ fileKey: key, fileType: "application/pdf", fileSize: pdf.length, ticketId });
     expect(key).toMatch(/^chamados\/[0-9a-f-]{36}\.pdf$/);
 
-    expect((await canViewAttachment(admin, att.id)).allowed).toBe(true);
+    expect((await canViewAttachment(financeiro, att.id)).allowed).toBe(true);
     expect((await canViewAttachment(chefiaA, att.id)).allowed).toBe(true);
     expect((await canViewAttachment(chefiaB, att.id)).allowed).toBe(false);
+    expect((await canViewAttachment(admin, att.id)).allowed).toBe(false);
 
     const res = await fetch(await presignDownload(att.fileKey, att.fileName, att.fileType));
     expect(res.ok).toBe(true);
@@ -138,6 +144,65 @@ describe("anexos com S3 presigned", () => {
         },
       }),
     ).rejects.toThrow();
+  });
+
+  it("só aceita Aberto → Em Processamento → Concluído, ou Cancelado com motivo", async () => {
+    const opened = await db.ticket.create({
+      data: {
+        type: "PURCHASE_QUOTE",
+        title: "Fluxo",
+        description: "Teste",
+        justification: "Teste",
+        sectorId: sectorA,
+        requesterId: chefiaA.id,
+      },
+    });
+    await expect(
+      db.ticket.update({ where: { id: opened.id }, data: { status: "COMPLETED", closedAt: new Date() } }),
+    ).rejects.toThrow(/Transição/);
+    await expect(
+      db.ticket.update({ where: { id: opened.id }, data: { status: "CANCELED", closedAt: new Date() } }),
+    ).rejects.toThrow();
+    await db.ticket.update({
+      where: { id: opened.id },
+      data: { status: "CANCELED", cancellationReason: "Sem verba no período", closedAt: new Date() },
+    });
+
+    const viable = await db.ticket.create({
+      data: {
+        type: "CONTRACT_INCLUSION",
+        title: "Fluxo viável",
+        description: "Teste",
+        justification: "Teste",
+        sectorId: sectorA,
+        requesterId: chefiaA.id,
+      },
+    });
+    await expect(
+      db.ticket.update({ where: { id: viable.id }, data: { status: "IN_PROGRESS" } }),
+    ).rejects.toThrow();
+    await db.ticket.update({
+      where: { id: viable.id },
+      data: { status: "IN_PROGRESS", processingStartedAt: new Date() },
+    });
+    await db.ticket.update({
+      where: { id: viable.id },
+      data: { status: "COMPLETED", closedAt: new Date() },
+    });
+  });
+
+  it("nota da chefia nasce pendente e só é lançada com os dados fiscais", async () => {
+    await expect(
+      db.invoice.create({
+        data: { description: "   ", sectorId: sectorA, submittedById: chefiaA.id },
+      }),
+    ).rejects.toThrow();
+
+    const pending = await db.invoice.create({
+      data: { description: "Material de curativo da UTI", sectorId: sectorA, submittedById: chefiaA.id },
+    });
+    expect(pending.status).toBe("PENDING");
+    await expect(db.invoice.update({ where: { id: pending.id }, data: { status: "POSTED" } })).rejects.toThrow();
   });
 
   it("banco recusa chefia sem setor (CHECK)", async () => {

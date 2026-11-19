@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { ClipboardList } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent } from "@/components/ui/card";
-import { requireUser } from "@/lib/dal";
+import { requireRole } from "@/lib/dal";
 
 export const metadata: Metadata = { title: "Chamados" };
 
 export default async function TicketsPage() {
-  const user = await requireUser();
+  const user = await requireRole("FINANCEIRO", "REQUESTER");
   const scope =
-    user.role === "ADMIN"
-      ? "Você verá os chamados de todos os setores."
-      : `Você verá os chamados do setor ${user.sector?.name ?? ""}.`;
+    user.role === "FINANCEIRO"
+      ? "Você avalia cada chamado: se for viável, segue para Em Processamento e depois Concluído; se não, é Cancelado com um motivo visível para quem abriu."
+      : "Você vê somente os chamados que você mesma abriu, com o resultado: Em Processamento, Concluído ou Cancelado (com o motivo).";
 
   return (
     <>

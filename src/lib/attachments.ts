@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
+import { canViewOwnSubmission } from "@/lib/access";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/dal";
 import { env } from "@/lib/env";
@@ -57,21 +58,9 @@ export async function attachUploadedFile(
   });
 }
 
-/** ADMIN vê tudo; chefia vê anexos de chamados do próprio setor (comentários internos nunca). */
+/** FINANCEIRO vê qualquer anexo; a chefia só os que ela mesma enviou; ADMIN nenhum. */
 export async function canViewAttachment(user: CurrentUser, attachmentId: string) {
-  const att = await db.attachment.findUnique({
-    where: { id: attachmentId },
-    include: {
-      ticket: { select: { sectorId: true } },
-      comment: { select: { visibility: true, ticket: { select: { sectorId: true } } } },
-    },
-  });
+  const att = await db.attachment.findUnique({ where: { id: attachmentId } });
   if (!att) return { attachment: null, allowed: false };
-  if (user.role === "ADMIN") return { attachment: att, allowed: true };
-
-  const sectorId = user.sectorId;
-  const allowed =
-    (!!att.ticket && att.ticket.sectorId === sectorId) ||
-    (!!att.comment && att.comment.visibility === "PUBLIC" && att.comment.ticket.sectorId === sectorId);
-  return { attachment: att, allowed };
+  return { attachment: att, allowed: canViewOwnSubmission(user, att.uploadedById) };
 }

@@ -24,7 +24,7 @@ async function ensureUser(data: {
   email: string;
   name: string;
   password: string;
-  role: "ADMIN" | "REQUESTER";
+  role: "ADMIN" | "FINANCEIRO" | "REQUESTER";
   sectorId: string;
 }) {
   const email = data.email.toLowerCase();
@@ -53,9 +53,16 @@ async function main() {
 
   const admin = await ensureUser({
     email: required("SEED_ADMIN_EMAIL"),
-    name: "Administrador Financeiro",
+    name: "Administrador de TI",
     password: required("SEED_ADMIN_PASSWORD"),
     role: "ADMIN",
+    sectorId: sectors.get("Faturamento")!,
+  });
+  const financeiro = await ensureUser({
+    email: required("SEED_FINANCEIRO_EMAIL"),
+    name: "Coordenadora Financeira",
+    password: required("SEED_FINANCEIRO_PASSWORD"),
+    role: "FINANCEIRO",
     sectorId: sectors.get("Faturamento")!,
   });
   const chefia = await ensureUser({
@@ -67,7 +74,7 @@ async function main() {
   });
 
   console.log(`Setores: ${sectors.size}`);
-  for (const { user, created } of [admin, chefia]) {
+  for (const { user, created } of [admin, financeiro, chefia]) {
     console.log(`${created ? "Criado" : "Já existia"}: ${user.email} (${user.role})`);
   }
 }

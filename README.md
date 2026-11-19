@@ -17,9 +17,11 @@ Prisma 7 + PostgreSQL · Auth.js v5 (Credentials, sessão JWT) · S3 privado com
 
 ## Perfis
 
-- **ADMIN** — Faturamento/Compras. Acessa tudo, cria e gerencia contas.
-- **REQUESTER** — somente **chefias de setor**. Sempre vinculadas a um setor (garantido por `CHECK` no banco);
-  veem apenas o módulo Chamados e só os anexos de chamados do próprio setor.
+- **ADMIN** — TI. Só gerencia usuários e setores. Não vê chamados, notas nem lançamentos.
+- **FINANCEIRO** — a coordenadora. Avalia chamados e lança notas, boletos, contratos e orçamentos. Não cria usuários. Vê tudo o que foi enviado.
+- **REQUESTER** — somente **chefias de setor**, sempre vinculadas a um setor (`CHECK` no banco). Cada chefia vê só os chamados que ela abriu e as notas que ela enviou, com o resultado da avaliação.
+
+Fluxo do chamado: Aberto → o Financeiro avalia → Em Processamento → Concluído, ou Cancelado com motivo obrigatório visível para quem abriu. A transição é garantida por trigger no banco.
 
 Não há auto-cadastro. O ADMIN cria a conta em **Administração → Usuários**; o sistema gera uma senha
 provisória (exibida uma única vez) e obriga a troca no primeiro acesso. "Redefinir senha" segue o mesmo fluxo.
@@ -42,7 +44,8 @@ Contas do seed (senha provisória, troca obrigatória no primeiro login):
 
 | Perfil | E-mail | Senha inicial |
 |---|---|---|
-| ADMIN | `admin@hospital.local` | `Admin@123456` |
+| ADMIN (TI) | `admin@hospital.local` | `Admin@123456` |
+| Financeiro | `financeiro@hospital.local` | `Financeiro@123456` |
 | Chefia (UTI Adulto) | `chefia.uti@hospital.local` | `Chefia@123456` |
 
 E-mails e senhas vêm de `SEED_*` no `.env`. O seed não sobrescreve contas existentes.
@@ -56,10 +59,10 @@ E-mails e senhas vêm de `SEED_*` no `.env`. O seed não sobrescreve contas exis
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm run lint` / `typecheck` | ESLint / `next typegen` + `tsc` |
 | `npm test` | testes unitários (keys do S3, token de upload, políticas) |
-| `npm run test:integration` | Postgres + S3 reais: upload, anexo, permissão por setor, download, CHECKs |
+| `npm run test:integration` | Postgres + S3 reais: upload, anexo visível só ao autor e ao financeiro, fluxo do chamado, nota pendente, CHECKs |
 | `npm run db:migrate` | nova migration em dev |
 | `npm run db:deploy` | aplica migrations (prod/CI) |
-| `npm run db:seed` | setores de exemplo + admin + chefia |
+| `npm run db:seed` | setores de exemplo + admin, financeiro e chefia |
 | `npm run s3:setup` | cria bucket privado, bloqueio público e CORS para `APP_URL` |
 
 ## Estrutura

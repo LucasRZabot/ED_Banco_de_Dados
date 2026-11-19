@@ -11,7 +11,7 @@ export default function LoginPage() {
       <CardHeader>
         <CardTitle>Entrar</CardTitle>
         <CardDescription>
-          Acesso restrito à equipe de Faturamento/Compras e às chefias de setor.
+          Acesso restrito à TI, à coordenação financeira e às chefias de setor.
         </CardDescription>
       </CardHeader>
       <CardContent>

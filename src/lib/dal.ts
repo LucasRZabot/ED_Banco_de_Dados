@@ -3,11 +3,11 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
-import { homePathFor } from "@/lib/roles";
+import { homePathFor, type AppRole } from "@/lib/roles";
 
 /**
  * Fonte de verdade da autorização: relê o usuário no banco a cada requisição, então
- * desativação ou troca de papel feitas pelo ADMIN valem na hora, mesmo com JWT ainda válido.
+ * desativação ou troca de perfil feitas pelo ADMIN valem na hora, mesmo com JWT ainda válido.
  */
 export const getCurrentUser = cache(async () => {
   const session = await auth();
@@ -41,11 +41,17 @@ export async function requireUser(opts: { allowPendingPassword?: boolean } = {})
   return user;
 }
 
-export async function requireAdmin() {
+export async function requireRole(...roles: AppRole[]) {
   const user = await requireUser();
-  if (user.role !== "ADMIN") redirect(homePathFor(user.role));
+  if (!roles.includes(user.role)) redirect(homePathFor(user.role));
   return user;
 }
+
+/** Gestão de usuários e setores (TI). */
+export const requireAdmin = () => requireRole("ADMIN");
+
+/** Lançamentos financeiros e avaliação de chamados. */
+export const requireFinance = () => requireRole("FINANCEIRO");
 
 /** Para route handlers: devolve o usuário ou uma Response de erro pronta. */
 export async function authenticateRequest():

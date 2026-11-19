@@ -1,24 +1,24 @@
 import type { Metadata } from "next";
-import { Building, ShieldCheck, UserRound } from "lucide-react";
+import { ClipboardList, Loader, Receipt } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireAdmin } from "@/lib/dal";
+import { requireFinance } from "@/lib/dal";
 import { db } from "@/lib/db";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  await requireAdmin();
-  const [admins, requesters, sectors] = await Promise.all([
-    db.user.count({ where: { role: "ADMIN", active: true } }),
-    db.user.count({ where: { role: "REQUESTER", active: true } }),
-    db.sector.count({ where: { active: true } }),
+  await requireFinance();
+  const [openTickets, inProgress, pendingInvoices] = await Promise.all([
+    db.ticket.count({ where: { status: "OPEN" } }),
+    db.ticket.count({ where: { status: "IN_PROGRESS" } }),
+    db.invoice.count({ where: { status: "PENDING" } }),
   ]);
 
   const cards = [
-    { title: "Administradores ativos", value: admins, icon: ShieldCheck },
-    { title: "Chefias ativas", value: requesters, icon: UserRound },
-    { title: "Setores ativos", value: sectors, icon: Building },
+    { title: "Chamados aguardando avaliação", value: openTickets, icon: ClipboardList },
+    { title: "Chamados em processamento", value: inProgress, icon: Loader },
+    { title: "Notas aguardando lançamento", value: pendingInvoices, icon: Receipt },
   ];
 
   return (

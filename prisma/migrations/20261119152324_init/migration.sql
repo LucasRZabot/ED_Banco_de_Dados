@@ -1,11 +1,11 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('ADMIN', 'REQUESTER');
+CREATE TYPE "Role" AS ENUM ('ADMIN', 'FINANCEIRO', 'REQUESTER');
 
 -- CreateEnum
 CREATE TYPE "TicketType" AS ENUM ('PURCHASE_QUOTE', 'CONTRACT_INCLUSION');
 
 -- CreateEnum
-CREATE TYPE "TicketStatus" AS ENUM ('OPEN', 'IN_REVIEW', 'APPROVED', 'COMPLETED', 'REJECTED');
+CREATE TYPE "TicketStatus" AS ENUM ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELED');
 
 -- CreateEnum
 CREATE TYPE "Urgency" AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
@@ -130,10 +130,11 @@ CREATE TABLE "tickets" (
     "quantity" INTEGER,
     "justification" TEXT NOT NULL,
     "neededBy" DATE,
-    "rejectionReason" TEXT,
+    "cancellationReason" TEXT,
     "sectorId" TEXT NOT NULL,
     "requesterId" TEXT NOT NULL,
     "assigneeId" TEXT,
+    "processingStartedAt" TIMESTAMP(3),
     "closedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -583,7 +584,6 @@ ALTER TABLE "notifications" ADD CONSTRAINT "notifications_contractId_fkey" FOREI
 
 -- AddForeignKey
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_quoteId_fkey" FOREIGN KEY ("quoteId") REFERENCES "quotes"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
 -- ───────────── Regras de integridade que o Prisma não expressa ─────────────
 
 -- Chefia (REQUESTER) sempre vinculada a um setor
@@ -605,3 +605,46 @@ ALTER TABLE "bills"     ADD CONSTRAINT "bills_amount_chk"     CHECK ("amount" > 
 ALTER TABLE "invoices"  ADD CONSTRAINT "invoices_amount_chk"  CHECK ("amount" > 0);
 ALTER TABLE "quotes"    ADD CONSTRAINT "quotes_amount_chk"    CHECK ("amount" > 0);
 ALTER TABLE "contracts" ADD CONSTRAINT "contracts_alert_days_chk" CHECK ("alertDaysBefore" BETWEEN 0 AND 365);
+
+-- ───────────── Fluxo do chamado ─────────────
+-- Aberto → (FINANCEIRO avalia) → Em Processamento → Concluído; ou → Cancelado com motivo.
+
+-- Cancelado exige motivo não vazio; motivo só existe em chamado cancelado
+ALTER TABLE "tickets" ADD CONSTRAINT "tickets_cancellation_reason_chk"
+  CHECK (("status" = 'CANCELED') = ("cancellationReason" IS NOT NULL AND btrim("cancellationReason") <> ''));
+
+-- closedAt preenchido exatamente nos status finais
+ALTER TABLE "tickets" ADD CONSTRAINT "tickets_closed_at_chk"
+  CHECK (("status" IN ('COMPLETED', 'CANCELED')) = ("closedAt" IS NOT NULL));
+
+-- Quem passou por Em Processamento tem a data registrada
+ALTER TABLE "tickets" ADD CONSTRAINT "tickets_processing_started_chk"
+  CHECK ("status" NOT IN ('IN_PROGRESS', 'COMPLETED') OR "processingStartedAt" IS NOT NULL);
+
+-- Transições válidas, garantidas também para updates fora da aplicação
+CREATE FUNCTION tickets_enforce_status_flow() RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW."status" <> 'OPEN' THEN
+      RAISE EXCEPTION 'Chamado deve ser criado como OPEN (recebido: %)', NEW."status" USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF NEW."status" = OLD."status" THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT (
+    (OLD."status" = 'OPEN' AND NEW."status" IN ('IN_PROGRESS', 'CANCELED')) OR
+    (OLD."status" = 'IN_PROGRESS' AND NEW."status" IN ('COMPLETED', 'CANCELED'))
+  ) THEN
+    RAISE EXCEPTION 'Transição de status inválida: % → %', OLD."status", NEW."status" USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "tickets_status_flow"
+  BEFORE INSERT OR UPDATE OF "status" ON "tickets"
+  FOR EACH ROW EXECUTE FUNCTION tickets_enforce_status_flow();

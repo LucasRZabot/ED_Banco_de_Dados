@@ -26,17 +26,17 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Geral",
     items: [
-      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["ADMIN"] },
-      { title: "Chamados", href: "/chamados", icon: ClipboardList, roles: ["ADMIN", "REQUESTER"] },
+      { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["FINANCEIRO"] },
+      { title: "Chamados", href: "/chamados", icon: ClipboardList, roles: ["FINANCEIRO", "REQUESTER"] },
     ],
   },
   {
     label: "Financeiro",
     items: [
-      { title: "Orçamentos", href: "/orcamentos", icon: FileText, roles: ["ADMIN"], soon: true },
-      { title: "Notas Fiscais", href: "/notas-fiscais", icon: Receipt, roles: ["ADMIN"], soon: true },
-      { title: "Boletos", href: "/boletos", icon: Banknote, roles: ["ADMIN"], soon: true },
-      { title: "Contratos", href: "/contratos", icon: FileSignature, roles: ["ADMIN"], soon: true },
+      { title: "Orçamentos", href: "/orcamentos", icon: FileText, roles: ["FINANCEIRO"], soon: true },
+      { title: "Notas Fiscais", href: "/notas-fiscais", icon: Receipt, roles: ["FINANCEIRO", "REQUESTER"] },
+      { title: "Boletos", href: "/boletos", icon: Banknote, roles: ["FINANCEIRO"], soon: true },
+      { title: "Contratos", href: "/contratos", icon: FileSignature, roles: ["FINANCEIRO"], soon: true },
     ],
   },
   {

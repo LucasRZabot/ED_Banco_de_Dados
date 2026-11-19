@@ -43,7 +43,7 @@ export default async function UsersPage() {
     <>
       <PageHeader
         title="Usuários"
-        description="Contas são criadas somente aqui. Chefias de setor abrem chamados; administradores operam o financeiro."
+        description="Contas são criadas somente aqui. O administrador não acessa chamados nem lançamentos."
         actions={<CreateUserButton sectors={sectors} />}
       />
       <Card className="py-0">
@@ -66,8 +66,8 @@ export default async function UsersPage() {
                   <div className="text-xs text-muted-foreground">{u.email}</div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={u.role === "ADMIN" ? "default" : "secondary"}>
-                    {u.role === "ADMIN" ? "Administrador" : "Chefia"}
+                  <Badge variant={u.role === "REQUESTER" ? "outline" : u.role === "ADMIN" ? "default" : "secondary"}>
+                    {u.role === "ADMIN" ? "Administrador" : u.role === "FINANCEIRO" ? "Financeiro" : "Chefia"}
                   </Badge>
                 </TableCell>
                 <TableCell>{u.sector?.name ?? "—"}</TableCell>

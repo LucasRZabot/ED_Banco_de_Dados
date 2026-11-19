@@ -1,8 +1,7 @@
 import type { NextAuthConfig } from "next-auth";
-import { homePathFor, type AppRole } from "@/lib/roles";
+import { canAccessPath, homePathFor, type AppRole } from "@/lib/roles";
 
 const PUBLIC_PATHS = ["/login"];
-const ADMIN_PREFIXES = ["/dashboard", "/admin", "/orcamentos", "/notas-fiscais", "/boletos", "/contratos"];
 
 const maxAgeHours = Number(process.env.AUTH_SESSION_MAX_AGE_HOURS ?? 10);
 
@@ -23,9 +22,7 @@ export const authConfig = {
       if (!auth?.user) return false;
 
       if (pathname === "/") return Response.redirect(new URL(homePathFor(role), nextUrl));
-      if (role !== "ADMIN" && ADMIN_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
-        return Response.redirect(new URL(homePathFor(role), nextUrl));
-      }
+      if (!canAccessPath(role, pathname)) return Response.redirect(new URL(homePathFor(role), nextUrl));
       return true;
     },
     jwt({ token, user }) {

@@ -26,20 +26,20 @@ type CategoryPolicy = {
 };
 
 export const CATEGORY_POLICY: Record<AttachmentCategoryKey, CategoryPolicy> = {
-  TICKET: { prefix: "chamados", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["ADMIN", "REQUESTER"] },
-  COMMENT: { prefix: "chamados", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["ADMIN", "REQUESTER"] },
-  QUOTE: { prefix: "orcamentos", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["ADMIN"] },
-  INVOICE_PDF: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: [PDF], roles: ["ADMIN"] },
-  INVOICE_XML: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: XML, roles: ["ADMIN"] },
-  BILL: { prefix: "boletos", datedPrefix: true, mimeTypes: [PDF, ...IMAGES], roles: ["ADMIN"] },
+  TICKET: { prefix: "chamados", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO", "REQUESTER"] },
+  COMMENT: { prefix: "chamados", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO", "REQUESTER"] },
+  QUOTE: { prefix: "orcamentos", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO"] },
+  INVOICE_PDF: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: [PDF], roles: ["FINANCEIRO", "REQUESTER"] },
+  INVOICE_XML: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: XML, roles: ["FINANCEIRO", "REQUESTER"] },
+  BILL: { prefix: "boletos", datedPrefix: true, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO"] },
   BILL_PAYMENT_PROOF: {
     prefix: "boletos",
     datedPrefix: true,
     mimeTypes: [PDF, ...IMAGES],
-    roles: ["ADMIN"],
+    roles: ["FINANCEIRO"],
     suffix: "-comprovante",
   },
-  CONTRACT: { prefix: "contratos", datedPrefix: false, mimeTypes: [PDF], roles: ["ADMIN"] },
+  CONTRACT: { prefix: "contratos", datedPrefix: false, mimeTypes: [PDF], roles: ["FINANCEIRO"] },
 };
 
 const EXTENSIONS: Record<string, string> = {

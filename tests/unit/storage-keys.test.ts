@@ -52,12 +52,14 @@ describe("buildFileKey", () => {
 });
 
 describe("políticas de upload", () => {
-  it("chefia só anexa em chamados e comentários", () => {
+  it("separa o que cada perfil pode anexar", () => {
     expect(canUploadCategory("REQUESTER", "TICKET")).toBe(true);
-    expect(canUploadCategory("REQUESTER", "COMMENT")).toBe(true);
-    expect(canUploadCategory("REQUESTER", "INVOICE_PDF")).toBe(false);
+    expect(canUploadCategory("REQUESTER", "INVOICE_PDF")).toBe(true);
+    expect(canUploadCategory("REQUESTER", "INVOICE_XML")).toBe(true);
     expect(canUploadCategory("REQUESTER", "BILL")).toBe(false);
-    expect(canUploadCategory("ADMIN", "CONTRACT")).toBe(true);
+    expect(canUploadCategory("FINANCEIRO", "CONTRACT")).toBe(true);
+    expect(canUploadCategory("ADMIN", "INVOICE_PDF")).toBe(false);
+    expect(canUploadCategory("ADMIN", "TICKET")).toBe(false);
   });
 
   it("restringe MIME por categoria", () => {
