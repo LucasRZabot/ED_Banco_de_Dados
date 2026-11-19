@@ -75,13 +75,18 @@ async function DashboardContent() {
     },
     {
       title: "Contratos próximos",
-      href: "/contratos",
+      href: "/contratos?expiring=1",
       count: snap.expiringContracts,
       amount: null,
-      extra: "Lista de contratos entra na Etapa 7",
+      extra:
+        snap.expiringContracts === 0
+          ? "Nenhum vence ou renova nos próximos 30 dias"
+          : snap.expiringContractItems
+              .slice(0, 2)
+              .map((c) => c.supplier.legalName)
+              .join(" · "),
       icon: FileSignature,
       level: snap.expiringContracts > 0 ? ("warning" as const) : ("ok" as const),
-      placeholder: true,
     },
   ];
 
@@ -93,7 +98,7 @@ async function DashboardContent() {
       />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((c) => (
-          <Link key={c.title} href={c.placeholder ? "/dashboard" : c.href} className="block">
+          <Link key={c.title} href={c.href} className="block">
             <Card className={cn("h-full transition-colors hover:bg-muted/40", deadlineCardClass(c.level))}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardDescription>{c.title}</CardDescription>

@@ -44,13 +44,19 @@ export async function getDashboardSnapshot() {
     }),
     db.ticket.count({ where: { status: "OPEN" } }),
     db.ticket.count({ where: { status: "IN_PROGRESS" } }),
-    db.contract.count({
+    db.contract.findMany({
       where: {
         status: "ACTIVE",
-        OR: [
-          { endDate: { lte: in30 } },
-          { renewalDate: { lte: in30 } },
-        ],
+        OR: [{ endDate: { lte: in30 } }, { renewalDate: { lte: in30 } }],
+      },
+      orderBy: [{ endDate: "asc" }, { renewalDate: "asc" }],
+      take: 8,
+      select: {
+        id: true,
+        object: true,
+        endDate: true,
+        renewalDate: true,
+        supplier: { select: { legalName: true } },
       },
     }),
     db.bill.findMany({
@@ -78,7 +84,8 @@ export async function getDashboardSnapshot() {
     pendingTickets: openTickets + inProgressTickets,
     openTickets,
     inProgressTickets,
-    expiringContracts,
+    expiringContracts: expiringContracts.length,
+    expiringContractItems: expiringContracts,
     alertBills,
   };
 }

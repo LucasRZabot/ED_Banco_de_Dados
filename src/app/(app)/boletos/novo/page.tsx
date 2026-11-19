@@ -23,7 +23,8 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
   const raw = await searchParams;
   const invoiceId = typeof raw.invoiceId === "string" ? raw.invoiceId : undefined;
   const quoteId = typeof raw.quoteId === "string" ? raw.quoteId : undefined;
-  const [sectors, suppliers, invoice, quote] = await Promise.all([
+  const contractId = typeof raw.contractId === "string" ? raw.contractId : undefined;
+  const [sectors, suppliers, invoice, quote, contract] = await Promise.all([
     listSectorsForBills(),
     listSuppliersForBills(),
     invoiceId
@@ -52,9 +53,23 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
           },
         })
       : Promise.resolve(null),
+    contractId
+      ? db.contract.findUnique({
+          where: { id: contractId },
+          select: {
+            id: true,
+            object: true,
+            monthlyValue: true,
+            totalValue: true,
+            sectorId: true,
+            supplierId: true,
+          },
+        })
+      : Promise.resolve(null),
   ]);
   const fromPosted = invoice?.status === "POSTED" ? invoice : null;
   const fromQuote = !fromPosted && quote?.status === "APPROVED" ? quote : null;
+  const fromContract = !fromPosted && !fromQuote ? contract : null;
 
   return (
     <>
@@ -65,13 +80,16 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
             ? "Boleto vinculado à nota lançada. Confira valor, setor e fornecedor."
             : fromQuote
               ? "Boleto a partir do orçamento aprovado. Confira valor, setor e fornecedor."
-              : "Linha digitável, valor, vencimento, setor, fornecedor e o PDF do boleto para a coordenação abrir e visualizar."
+              : fromContract
+                ? "Boleto vinculado ao contrato. Confira valor, setor e fornecedor."
+                : "Linha digitável, valor, vencimento, setor, fornecedor e o PDF do boleto para a coordenação abrir e visualizar."
         }
       />
       <BillForm
         sectors={sectors}
         suppliers={suppliers}
         invoiceId={fromPosted?.id}
+        contractId={fromContract?.id}
         draft={
           fromPosted
             ? {
@@ -93,7 +111,19 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
                   sectorId: fromQuote.ticket?.sectorId ?? "",
                   supplierId: fromQuote.supplierId,
                 }
-              : undefined
+              : fromContract
+                ? {
+                    digitableLine: "",
+                    amount: Number(fromContract.monthlyValue ?? fromContract.totalValue ?? 0)
+                      .toFixed(2)
+                      .replace(".", ","),
+                    dueDate: toDateInputValue(new Date()),
+                    description: fromContract.object,
+                    installment: "",
+                    sectorId: fromContract.sectorId,
+                    supplierId: fromContract.supplierId,
+                  }
+                : undefined
         }
       />
     </>

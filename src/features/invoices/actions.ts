@@ -171,7 +171,7 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
       });
       await attachTokens(pdfTokens, user, invoice.id, ["INVOICE_PDF"], tx);
       await attachTokens(xmlTokens, user, invoice.id, ["INVOICE_XML"], tx);
-      if (ticketId) await completeLinkedTicket(tx, ticketId, user.id);
+      if (ticketId) await completeLinkedTicket(tx, ticketId, user.id, ["PURCHASE_QUOTE"]);
     });
   } catch (err) {
     if (err instanceof InvoiceActionError) return { error: err.message };

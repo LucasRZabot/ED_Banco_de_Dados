@@ -6,20 +6,21 @@ import { TICKET_RESULT_LABELS, TICKET_STATUS_LABELS } from "./labels";
 import { applyTransition, type TicketStatus } from "./status-machine";
 
 /**
- * Conclui um chamado de compra após o lançamento da NF convertida do orçamento.
+ * Conclui o chamado após conversão (NF de compra ou contrato de inclusão).
  * OPEN não pode ir direto a COMPLETED (trigger do banco): passa por IN_PROGRESS.
  */
 export async function completeLinkedTicket(
   tx: Prisma.TransactionClient,
   ticketId: string,
   userId: string,
+  allowedTypes: Array<"PURCHASE_QUOTE" | "CONTRACT_INCLUSION"> = ["PURCHASE_QUOTE", "CONTRACT_INCLUSION"],
 ) {
   const ticket = await tx.ticket.findUnique({
     where: { id: ticketId },
     select: { id: true, code: true, title: true, type: true, status: true, requesterId: true },
   });
   if (!ticket) return;
-  if (ticket.type !== "PURCHASE_QUOTE") return;
+  if (!allowedTypes.includes(ticket.type as "PURCHASE_QUOTE" | "CONTRACT_INCLUSION")) return;
   if (ticket.status === "COMPLETED" || ticket.status === "CANCELED") return;
 
   const now = new Date();

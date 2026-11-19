@@ -56,9 +56,14 @@ export async function createBill(_prev: BillFormState, formData: FormData): Prom
   const tokens = tokensFrom(formData);
   let billId = "";
   const invoiceId = parsed.data.invoiceId;
+  const contractId = parsed.data.contractId;
   if (invoiceId) {
     const invoice = await db.invoice.findUnique({ where: { id: invoiceId }, select: { id: true, status: true } });
     if (!invoice || invoice.status !== "POSTED") return { error: "Nota inválida para gerar boleto." };
+  }
+  if (contractId) {
+    const contract = await db.contract.findUnique({ where: { id: contractId }, select: { id: true } });
+    if (!contract) return { error: "Contrato inválido para gerar boleto." };
   }
 
   try {
@@ -74,6 +79,7 @@ export async function createBill(_prev: BillFormState, formData: FormData): Prom
           supplierId,
           sectorId: parsed.data.sectorId,
           invoiceId,
+          contractId,
           createdById: user.id,
         },
       });

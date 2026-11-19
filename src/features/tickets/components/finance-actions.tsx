@@ -21,10 +21,12 @@ export function FinanceActions({
   ticketId,
   status,
   type,
+  contractId,
 }: {
   ticketId: string;
   status: TicketStatus;
   type: TicketType;
+  contractId?: string | null;
 }) {
   const next = TRANSITIONS[status];
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -37,9 +39,14 @@ export function FinanceActions({
           Novo orçamento
         </Button>
       ) : null}
-      {type === "CONTRACT_INCLUSION" && status !== "CANCELED" && status !== "COMPLETED" ? (
-        <Button type="button" variant="outline" disabled title="A conversão em contrato entra na Etapa 7.">
-          Converter em contrato (Etapa 7)
+      {type === "CONTRACT_INCLUSION" && contractId ? (
+        <Button nativeButton={false} variant="outline" render={<Link href={`/contratos/${contractId}`} />}>
+          Abrir contrato
+        </Button>
+      ) : null}
+      {type === "CONTRACT_INCLUSION" && !contractId && status !== "CANCELED" && status !== "COMPLETED" ? (
+        <Button nativeButton={false} variant="outline" render={<Link href={`/contratos/novo?ticketId=${ticketId}`} />}>
+          Converter em contrato
         </Button>
       ) : null}
       {state?.error ? <p className="w-full text-sm text-destructive">{state.error}</p> : null}
