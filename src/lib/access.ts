@@ -11,3 +11,5 @@ export function canViewOwnSubmission(viewer: Viewer, authorId: string) {
   if (viewer.role === "REQUESTER") return viewer.id === authorId;
   return false;
 }
+
+export const canViewTicket = canViewOwnSubmission;

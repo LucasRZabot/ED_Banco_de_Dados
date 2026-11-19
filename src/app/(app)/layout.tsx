@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { NotificationsBell } from "@/features/notifications/components/notifications-bell";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requireUser } from "@/lib/dal";
@@ -24,7 +25,13 @@ async function AuthenticatedShell({ children }: { children: React.ReactNode }) {
     <SidebarProvider defaultOpen={sidebarOpen}>
       <AppSidebar user={{ name: user.name, email: user.email, role: user.role, subtitle }} />
       <SidebarInset>
-        <Topbar />
+        <Topbar>
+          {user.role !== "ADMIN" ? (
+            <Suspense fallback={null}>
+              <NotificationsBell user={user} />
+            </Suspense>
+          ) : null}
+        </Topbar>
         <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
