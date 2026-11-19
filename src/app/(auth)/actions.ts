@@ -1,11 +1,13 @@
 "use server";
 
 import { AuthError } from "next-auth";
+import { headers } from "next/headers";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/dal";
 import { hashPassword, passwordSchema, verifyPassword } from "@/lib/password";
+import { clientKeyFromHeaders, loginLimiter } from "@/lib/rate-limit";
 import { homePathFor } from "@/lib/roles";
 
 /**
@@ -32,6 +34,10 @@ function safeRedirectPath(raw: FormDataEntryValue | null) {
 const INVALID_LOGIN = "E-mail ou senha inválidos, ou conta desativada.";
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ip = clientKeyFromHeaders(await headers());
+  if (!loginLimiter.take(`login:${ip}`)) {
+    return { error: "Muitas tentativas. Aguarde alguns minutos." };
+  }
   try {
     const url: string = await signIn("credentials", {
       email: formData.get("email"),

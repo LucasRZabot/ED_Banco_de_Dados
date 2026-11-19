@@ -146,9 +146,15 @@ describe("visibilidade de boletos", () => {
 });
 
 describe("cron check-deadlines", () => {
-  it("rejeita chamada sem Bearer", async () => {
+  it("rejeita chamada sem Bearer e com Bearer errado", async () => {
     const res = await GET(new Request("http://localhost/api/cron/check-deadlines"));
     expect(res.status).toBe(401);
+    const wrong = await GET(
+      new Request("http://localhost/api/cron/check-deadlines", {
+        headers: { authorization: "Bearer definitely-not-the-cron-secret" },
+      }),
+    );
+    expect(wrong.status).toBe(401);
   });
 
   it("marca atrasados, notifica o financeiro e não duplica na segunda execução", async () => {
