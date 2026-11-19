@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canViewBill, canViewOwnSubmission } from "@/lib/access";
+import { canViewBill, canViewInvoice, canViewOwnSubmission } from "@/lib/access";
 
 describe("visibilidade da chefia", () => {
   it("financeiro vê qualquer envio e a chefia só o próprio", () => {
@@ -7,6 +7,13 @@ describe("visibilidade da chefia", () => {
     expect(canViewOwnSubmission({ id: "chefia", role: "REQUESTER" }, "chefia")).toBe(true);
     expect(canViewOwnSubmission({ id: "chefia", role: "REQUESTER" }, "colega-do-mesmo-setor")).toBe(false);
     expect(canViewOwnSubmission({ id: "ti", role: "ADMIN" }, "ti")).toBe(false);
+  });
+
+  it("nota fiscal segue a visibilidade por autor", () => {
+    expect(canViewInvoice({ id: "chefia", role: "REQUESTER" }, "chefia")).toBe(true);
+    expect(canViewInvoice({ id: "chefia", role: "REQUESTER" }, "colega")).toBe(false);
+    expect(canViewInvoice({ id: "fin", role: "FINANCEIRO" }, "chefia")).toBe(true);
+    expect(canViewInvoice({ id: "ti", role: "ADMIN" }, "chefia")).toBe(false);
   });
 
   it("só o financeiro vê boletos", () => {

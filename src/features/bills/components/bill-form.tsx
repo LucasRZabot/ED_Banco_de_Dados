@@ -28,17 +28,23 @@ export function BillForm({
   sectors,
   suppliers,
   bill,
+  draft,
   existingPdfs = [],
+  invoiceId,
 }: {
   sectors: Sector[];
   suppliers: Supplier[];
   bill?: BillFormValues;
+  draft?: Omit<BillFormValues, "id">;
   existingPdfs?: { id: string; fileName: string; fileSize: number }[];
+  invoiceId?: string;
 }) {
-  const action = bill ? updateBill : createBill;
+  const editing = Boolean(bill?.id);
+  const initial = bill ?? draft;
+  const action = editing ? updateBill : createBill;
   const [state, formAction, pending] = useActionState(action, undefined);
-  const [supplierId, setSupplierId] = useState(bill?.supplierId ?? "");
-  const [dueDate, setDueDate] = useState(bill?.dueDate ?? "");
+  const [supplierId, setSupplierId] = useState(initial?.supplierId ?? "");
+  const [dueDate, setDueDate] = useState(initial?.dueDate ?? "");
   const [uploading, setUploading] = useState(false);
   const errors = state?.fieldErrors;
   const isNewSupplier = !supplierId;
@@ -46,7 +52,8 @@ export function BillForm({
 
   return (
     <form action={formAction} className="grid max-w-2xl gap-4">
-      {bill ? <input type="hidden" name="billId" value={bill.id} /> : null}
+      {editing ? <input type="hidden" name="billId" value={bill!.id} /> : null}
+      {invoiceId ? <input type="hidden" name="invoiceId" value={invoiceId} /> : null}
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
       <div className="grid gap-2">
@@ -58,7 +65,7 @@ export function BillForm({
           inputMode="numeric"
           autoComplete="off"
           placeholder="47 dígitos (boleto) ou 48 (convênio)"
-          defaultValue={bill?.digitableLine}
+          defaultValue={initial?.digitableLine}
         />
         <p className="text-xs text-muted-foreground">Pode colar com pontos e espaços; gravamos só os dígitos.</p>
         <FieldError messages={errors?.digitableLine} />
@@ -67,7 +74,7 @@ export function BillForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="amount">Valor (R$)</Label>
-          <Input id="amount" name="amount" required inputMode="decimal" placeholder="1.234,56" defaultValue={bill?.amount} />
+          <Input id="amount" name="amount" required inputMode="decimal" placeholder="1.234,56" defaultValue={initial?.amount} />
           <FieldError messages={errors?.amount} />
         </div>
         <div className="grid gap-2">
@@ -87,7 +94,7 @@ export function BillForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="sectorId">Setor / centro de custo</Label>
-          <NativeSelect id="sectorId" name="sectorId" required className="w-full" defaultValue={bill?.sectorId ?? ""}>
+          <NativeSelect id="sectorId" name="sectorId" required className="w-full" defaultValue={initial?.sectorId ?? ""}>
             <NativeSelectOption value="">Escolha o setor</NativeSelectOption>
             {sectors.map((s) => (
               <NativeSelectOption key={s.id} value={s.id}>
@@ -99,7 +106,7 @@ export function BillForm({
         </div>
         <div className="grid gap-2">
           <Label htmlFor="installment">Parcela (opcional)</Label>
-          <Input id="installment" name="installment" type="number" min={1} defaultValue={bill?.installment} />
+          <Input id="installment" name="installment" type="number" min={1} defaultValue={initial?.installment} />
           <FieldError messages={errors?.installment} />
         </div>
       </div>
@@ -139,7 +146,7 @@ export function BillForm({
 
       <div className="grid gap-2">
         <Label htmlFor="description">Descrição</Label>
-        <Textarea id="description" name="description" rows={3} defaultValue={bill?.description} />
+        <Textarea id="description" name="description" rows={3} defaultValue={initial?.description} />
         <FieldError messages={errors?.description} />
       </div>
 
@@ -159,7 +166,7 @@ export function BillForm({
       </div>
 
       <Button type="submit" disabled={busy}>
-        {busy ? "Salvando…" : bill ? "Salvar alterações" : "Cadastrar boleto"}
+        {busy ? "Salvando…" : editing ? "Salvar alterações" : "Cadastrar boleto"}
       </Button>
     </form>
   );

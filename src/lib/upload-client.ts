@@ -22,7 +22,9 @@ export async function uploadFile(
         ? "image/png"
         : file.name.toLowerCase().endsWith(".jpg") || file.name.toLowerCase().endsWith(".jpeg")
           ? "image/jpeg"
-          : file.type);
+          : file.name.toLowerCase().endsWith(".xml")
+            ? "application/xml"
+            : file.type);
   const res = await fetch("/api/uploads/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
