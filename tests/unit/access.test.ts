@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canViewBill, canViewContract, canViewInvoice, canViewOwnSubmission, canViewQuote } from "@/lib/access";
+import { canViewBill, canViewContract, canViewDashboard, canViewInvoice, canViewOwnSubmission, canViewQuote } from "@/lib/access";
+import { canAccessPath } from "@/lib/roles";
 
 describe("visibilidade da chefia", () => {
   it("financeiro vê qualquer envio e a chefia só o próprio", () => {
@@ -32,5 +33,14 @@ describe("visibilidade da chefia", () => {
     expect(canViewContract({ id: "fin", role: "FINANCEIRO" })).toBe(true);
     expect(canViewContract({ id: "chefia", role: "REQUESTER" })).toBe(false);
     expect(canViewContract({ id: "ti", role: "ADMIN" })).toBe(false);
+  });
+
+  it("só o financeiro vê o dashboard financeiro", () => {
+    expect(canViewDashboard({ id: "fin", role: "FINANCEIRO" })).toBe(true);
+    expect(canViewDashboard({ id: "chefia", role: "REQUESTER" })).toBe(false);
+    expect(canViewDashboard({ id: "ti", role: "ADMIN" })).toBe(false);
+    expect(canAccessPath("FINANCEIRO", "/dashboard")).toBe(true);
+    expect(canAccessPath("REQUESTER", "/dashboard")).toBe(false);
+    expect(canAccessPath("ADMIN", "/dashboard")).toBe(false);
   });
 });
