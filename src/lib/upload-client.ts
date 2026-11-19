@@ -14,13 +14,22 @@ export async function uploadFile(
   category: AttachmentCategoryKey,
   referenceDate?: string,
 ): Promise<UploadedFile> {
+  const fileType =
+    file.type ||
+    (file.name.toLowerCase().endsWith(".pdf")
+      ? "application/pdf"
+      : file.name.toLowerCase().endsWith(".png")
+        ? "image/png"
+        : file.name.toLowerCase().endsWith(".jpg") || file.name.toLowerCase().endsWith(".jpeg")
+          ? "image/jpeg"
+          : file.type);
   const res = await fetch("/api/uploads/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       category,
       fileName: file.name,
-      fileType: file.type,
+      fileType,
       fileSize: file.size,
       referenceDate,
     }),
@@ -35,7 +44,7 @@ export async function uploadFile(
     uploadToken: data.uploadToken,
     fileKey: data.fileKey,
     fileName: file.name,
-    fileType: file.type,
+    fileType,
     fileSize: file.size,
   };
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
+import { Paperclip } from "lucide-react";
 import { DeadlineBadge } from "@/components/shared/deadline-badge";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -49,7 +50,11 @@ async function BillsContent({ searchParams }: { searchParams: PageProps<"/boleto
       <PageHeader
         title="Boletos"
         description="Cadastro, vencimentos e baixa. Só a coordenação financeira vê e lança boletos."
-        actions={<Button render={<Link href="/boletos/novo" />}>Novo boleto</Button>}
+        actions={
+          <Button nativeButton={false} render={<Link href="/boletos/novo" />}>
+            Novo boleto
+          </Button>
+        }
       />
       <BillFiltersBar filters={filters} sectors={sectors} suppliers={suppliers} />
       <Card className="py-0">
@@ -82,8 +87,11 @@ async function BillsContent({ searchParams }: { searchParams: PageProps<"/boleto
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/boletos/${b.id}`} className="hover:underline">
+                      <Link href={`/boletos/${b.id}`} className="inline-flex items-center gap-1.5 hover:underline">
                         {b.supplier.legalName}
+                        {b.attachments.some((a) => a.category === "BILL") ? (
+                          <Paperclip className="size-3.5 text-muted-foreground" aria-label="PDF do boleto anexado" />
+                        ) : null}
                       </Link>
                     </TableCell>
                     <TableCell>

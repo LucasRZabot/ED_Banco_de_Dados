@@ -13,6 +13,7 @@ export function FileUpload({
   accept = "application/pdf,image/png,image/jpeg",
   multiple = true,
   referenceDate,
+  onBusyChange,
 }: {
   name?: string;
   category: AttachmentCategoryKey;
@@ -20,6 +21,7 @@ export function FileUpload({
   multiple?: boolean;
   /** YYYY-MM-DD: mês do vencimento/emissão na key do S3. */
   referenceDate?: string;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string>();
@@ -29,6 +31,7 @@ export function FileUpload({
     const list = event.target.files;
     if (!list?.length) return;
     setPending(true);
+    onBusyChange?.(true);
     setError(undefined);
     try {
       const uploaded: UploadedFile[] = [];
@@ -40,6 +43,7 @@ export function FileUpload({
       setError(err instanceof Error ? err.message : "Falha no envio.");
     } finally {
       setPending(false);
+      onBusyChange?.(false);
       event.target.value = "";
     }
   }

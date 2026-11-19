@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { AttachmentLinks } from "@/components/shared/attachment-links";
 import { FieldError } from "@/components/shared/field-error";
 import { FileUpload } from "@/components/shared/file-upload";
 import { Button } from "@/components/ui/button";
@@ -8,20 +9,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Textarea } from "@/components/ui/textarea";
-import { createBill } from "../actions";
+import { createBill, updateBill } from "../actions";
 
 type Sector = { id: string; name: string; costCenter: string };
 type Supplier = { id: string; legalName: string; cnpj: string };
+export type BillFormValues = {
+  id: string;
+  digitableLine: string;
+  amount: string;
+  dueDate: string;
+  description: string;
+  installment: string;
+  sectorId: string;
+  supplierId: string;
+};
 
-export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers: Supplier[] }) {
-  const [state, action, pending] = useActionState(createBill, undefined);
-  const [supplierId, setSupplierId] = useState("");
-  const [dueDate, setDueDate] = useState("");
+export function BillForm({
+  sectors,
+  suppliers,
+  bill,
+  existingPdfs = [],
+}: {
+  sectors: Sector[];
+  suppliers: Supplier[];
+  bill?: BillFormValues;
+  existingPdfs?: { id: string; fileName: string; fileSize: number }[];
+}) {
+  const action = bill ? updateBill : createBill;
+  const [state, formAction, pending] = useActionState(action, undefined);
+  const [supplierId, setSupplierId] = useState(bill?.supplierId ?? "");
+  const [dueDate, setDueDate] = useState(bill?.dueDate ?? "");
+  const [uploading, setUploading] = useState(false);
   const errors = state?.fieldErrors;
   const isNewSupplier = !supplierId;
+  const busy = pending || uploading;
 
   return (
-    <form action={action} className="grid max-w-2xl gap-4">
+    <form action={formAction} className="grid max-w-2xl gap-4">
+      {bill ? <input type="hidden" name="billId" value={bill.id} /> : null}
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
       <div className="grid gap-2">
@@ -33,6 +58,7 @@ export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers:
           inputMode="numeric"
           autoComplete="off"
           placeholder="47 dígitos (boleto) ou 48 (convênio)"
+          defaultValue={bill?.digitableLine}
         />
         <p className="text-xs text-muted-foreground">Pode colar com pontos e espaços; gravamos só os dígitos.</p>
         <FieldError messages={errors?.digitableLine} />
@@ -41,7 +67,7 @@ export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers:
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="amount">Valor (R$)</Label>
-          <Input id="amount" name="amount" required inputMode="decimal" placeholder="1.234,56" />
+          <Input id="amount" name="amount" required inputMode="decimal" placeholder="1.234,56" defaultValue={bill?.amount} />
           <FieldError messages={errors?.amount} />
         </div>
         <div className="grid gap-2">
@@ -61,7 +87,7 @@ export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers:
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="grid gap-2">
           <Label htmlFor="sectorId">Setor / centro de custo</Label>
-          <NativeSelect id="sectorId" name="sectorId" required className="w-full" defaultValue="">
+          <NativeSelect id="sectorId" name="sectorId" required className="w-full" defaultValue={bill?.sectorId ?? ""}>
             <NativeSelectOption value="">Escolha o setor</NativeSelectOption>
             {sectors.map((s) => (
               <NativeSelectOption key={s.id} value={s.id}>
@@ -73,7 +99,7 @@ export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers:
         </div>
         <div className="grid gap-2">
           <Label htmlFor="installment">Parcela (opcional)</Label>
-          <Input id="installment" name="installment" type="number" min={1} />
+          <Input id="installment" name="installment" type="number" min={1} defaultValue={bill?.installment} />
           <FieldError messages={errors?.installment} />
         </div>
       </div>
@@ -113,17 +139,27 @@ export function BillForm({ sectors, suppliers }: { sectors: Sector[]; suppliers:
 
       <div className="grid gap-2">
         <Label htmlFor="description">Descrição</Label>
-        <Textarea id="description" name="description" rows={3} />
+        <Textarea id="description" name="description" rows={3} defaultValue={bill?.description} />
         <FieldError messages={errors?.description} />
       </div>
 
       <div className="grid gap-2">
-        <Label>PDF do boleto (opcional)</Label>
-        <FileUpload category="BILL" multiple={false} referenceDate={dueDate || undefined} />
+        <Label>PDF do boleto</Label>
+        {existingPdfs.length ? <AttachmentLinks items={existingPdfs} /> : null}
+        <FileUpload
+          category="BILL"
+          multiple={false}
+          accept="application/pdf"
+          referenceDate={dueDate || undefined}
+          onBusyChange={setUploading}
+        />
+        <p className="text-xs text-muted-foreground">
+          Anexe o PDF para a coordenação abrir e visualizar. Aguarde o nome do arquivo aparecer antes de salvar.
+        </p>
       </div>
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Salvando…" : "Cadastrar boleto"}
+      <Button type="submit" disabled={busy}>
+        {busy ? "Salvando…" : bill ? "Salvar alterações" : "Cadastrar boleto"}
       </Button>
     </form>
   );

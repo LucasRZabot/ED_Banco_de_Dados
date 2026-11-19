@@ -92,6 +92,90 @@ export async function createBill(_prev: BillFormState, formData: FormData): Prom
   redirect(`/boletos/${billId}`);
 }
 
+export async function updateBill(_prev: BillFormState, formData: FormData): Promise<BillFormState> {
+  const user = await requireFinance();
+  const billId = String(formData.get("billId") ?? "");
+  if (!billId) return { error: "Boleto não encontrado." };
+
+  const existing = await db.bill.findUnique({
+    where: { id: billId },
+    select: { id: true, status: true },
+  });
+  if (!existing) return { error: "Boleto não encontrado." };
+  if (existing.status === "PAID") return { error: "Boleto pago: só é possível anexar o PDF, sem alterar os dados." };
+
+  const parsed = createBillSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
+
+  const sector = await db.sector.findUnique({
+    where: { id: parsed.data.sectorId },
+    select: { id: true, active: true },
+  });
+  if (!sector?.active) return { fieldErrors: { sectorId: ["Setor inválido ou inativo."] } };
+
+  const tokens = tokensFrom(formData);
+  try {
+    await db.$transaction(async (tx) => {
+      const supplierId = await resolveSupplier(tx, parsed.data);
+      await tx.bill.update({
+        where: { id: existing.id },
+        data: {
+          digitableLine: parsed.data.digitableLine,
+          amount: parsed.data.amount.toFixed(2),
+          dueDate: parseDateOnly(parsed.data.dueDate),
+          description: parsed.data.description,
+          installment: parsed.data.installment,
+          supplierId,
+          sectorId: parsed.data.sectorId,
+        },
+      });
+      for (const token of tokens) {
+        await attachUploadedFile(token, user, { billId: existing.id }, ["BILL"], tx);
+      }
+    });
+  } catch (err) {
+    if (err instanceof BillActionError) return { error: err.message };
+    if (err instanceof AttachmentError) return { error: err.message };
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      const target = JSON.stringify(err.meta?.target ?? "");
+      if (target.includes("cnpj")) return { fieldErrors: { supplierCnpj: ["Já existe um fornecedor com este CNPJ."] } };
+      return { fieldErrors: { digitableLine: ["Já existe um boleto com esta linha digitável."] } };
+    }
+    throw err;
+  }
+
+  revalidatePath("/boletos");
+  revalidatePath(`/boletos/${existing.id}`);
+  revalidatePath("/dashboard");
+  redirect(`/boletos/${existing.id}`);
+}
+
+export async function attachBillPdf(_prev: BillFormState, formData: FormData): Promise<BillFormState> {
+  const user = await requireFinance();
+  const billId = String(formData.get("billId") ?? "");
+  const tokens = tokensFrom(formData);
+  if (!billId) return { error: "Boleto não encontrado." };
+  if (!tokens.length) return { error: "Anexe o PDF do boleto." };
+
+  const bill = await db.bill.findUnique({ where: { id: billId }, select: { id: true } });
+  if (!bill) return { error: "Boleto não encontrado." };
+
+  try {
+    await db.$transaction(async (tx) => {
+      for (const token of tokens) {
+        await attachUploadedFile(token, user, { billId: bill.id }, ["BILL"], tx);
+      }
+    });
+  } catch (err) {
+    if (err instanceof AttachmentError) return { error: err.message };
+    throw err;
+  }
+
+  revalidatePath("/boletos");
+  revalidatePath(`/boletos/${bill.id}`);
+  redirect(`/boletos/${bill.id}`);
+}
+
 export async function payBill(_prev: BillFormState, formData: FormData): Promise<BillFormState> {
   const user = await requireFinance();
   const parsed = payBillSchema.safeParse({

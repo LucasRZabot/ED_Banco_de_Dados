@@ -39,16 +39,22 @@ export async function presignUpload(key: string, contentType: string) {
   );
 }
 
-export async function presignDownload(key: string, fileName: string, contentType: string) {
+export async function presignDownload(
+  key: string,
+  fileName: string,
+  contentType: string,
+  opts: { disposition?: "inline" | "attachment" } = {},
+) {
   const e = env();
   const safeAscii = fileName.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
+  const kind = opts.disposition ?? "inline";
   return getSignedUrl(
     s3(),
     new GetObjectCommand({
       Bucket: e.S3_BUCKET,
       Key: key,
       ResponseContentType: contentType,
-      ResponseContentDisposition: `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+      ResponseContentDisposition: `${kind}; filename="${safeAscii}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
     }),
     { expiresIn: e.S3_PRESIGN_EXPIRES_SECONDS },
   );

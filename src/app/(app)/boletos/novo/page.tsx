@@ -24,7 +24,7 @@ async function NewBillContent() {
     <>
       <PageHeader
         title="Novo boleto"
-        description="Linha digitável, valor, vencimento, setor e fornecedor. Chefia e TI não cadastram boletos."
+        description="Linha digitável, valor, vencimento, setor, fornecedor e o PDF do boleto para a coordenação abrir e visualizar."
       />
       <BillForm sectors={sectors} suppliers={suppliers} />
     </>
