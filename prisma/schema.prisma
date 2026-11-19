@@ -1,0 +1,518 @@
+// Prisma 7: a URL de conexão fica em prisma.config.ts e o client usa o driver adapter `pg`.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum Role {
+  ADMIN      // TI: só gestão de usuários e setores
+  FINANCEIRO // coordenação financeira: lançamentos e avaliação de chamados
+  REQUESTER  // chefia de setor
+}
+
+enum TicketType {
+  PURCHASE_QUOTE     // Compra / Orçamento
+  CONTRACT_INCLUSION // Inclusão de Contrato
+}
+
+// Transições válidas (trigger na migration): OPEN → IN_PROGRESS | CANCELED; IN_PROGRESS → COMPLETED | CANCELED.
+enum TicketStatus {
+  OPEN        // Aberto: aguardando avaliação do FINANCEIRO
+  IN_PROGRESS // Em Processamento: avaliado como viável
+  COMPLETED   // Concluído
+  CANCELED    // Cancelado: inviável, com motivo obrigatório visível à chefia
+}
+
+enum Urgency {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum CommentVisibility {
+  INTERNAL // só FINANCEIRO
+  PUBLIC   // resposta visível ao solicitante
+}
+
+enum QuoteStatus {
+  PENDING
+  APPROVED // Aprovado
+  REJECTED // Reprovado
+}
+
+enum InvoiceStatus {
+  PENDING  // enviada (pela chefia ou pelo financeiro), aguardando lançamento
+  POSTED   // lançada/complementada pelo FINANCEIRO
+  CANCELED
+}
+
+enum BillStatus {
+  TO_PAY  // A Pagar
+  PAID    // Pago
+  OVERDUE // Atrasado
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXPIRED
+  TERMINATED
+}
+
+enum AttachmentCategory {
+  TICKET
+  COMMENT
+  QUOTE
+  INVOICE_PDF
+  INVOICE_XML
+  BILL               // PDF do boleto
+  BILL_PAYMENT_PROOF // comprovante de pagamento
+  CONTRACT
+}
+
+enum NotificationType {
+  BILL_DUE_SOON
+  BILL_DUE_TODAY
+  BILL_OVERDUE
+  CONTRACT_EXPIRING
+  CONTRACT_EXPIRED
+  QUOTE_EXPIRING
+  TICKET_CREATED
+  TICKET_STATUS_CHANGED
+  TICKET_COMMENT
+}
+
+enum NotificationSeverity {
+  INFO
+  WARNING  // amarelo
+  CRITICAL // vermelho
+}
+
+// ───────────────────────── Auth.js (adapter) ─────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String? // bcrypt; contas criadas só pelo ADMIN (TI), sem auto-cadastro
+  role          Role      @default(REQUESTER)
+  active        Boolean   @default(true)
+  mustChangePassword Boolean @default(true) // senha provisória definida pelo ADMIN
+  sectorId      String? // obrigatório para REQUESTER (chefia do setor) — CHECK na migration
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sector Sector? @relation(fields: [sectorId], references: [id])
+
+  accounts            Account[]
+  sessions            Session[]
+  ticketsRequested    Ticket[]              @relation("TicketRequester")
+  ticketsAssigned     Ticket[]              @relation("TicketAssignee")
+  ticketComments      TicketComment[]
+  ticketStatusChanges TicketStatusHistory[]
+  quotesCreated       Quote[]               @relation("QuoteCreatedBy")
+  quotesDecided       Quote[]               @relation("QuoteDecidedBy")
+  invoicesSubmitted   Invoice[]             @relation("InvoiceSubmittedBy")
+  invoicesPosted      Invoice[]             @relation("InvoicePostedBy")
+  billsCreated        Bill[]                @relation("BillCreatedBy")
+  billsPaid           Bill[]                @relation("BillPaidBy")
+  contractsCreated    Contract[]            @relation("ContractCreatedBy")
+  attachments         Attachment[]
+  notifications       Notification[]
+
+  @@index([role, active])
+  @@index([sectorId])
+  @@map("users")
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ───────────────────────────── Cadastros ─────────────────────────────
+
+model Sector {
+  id         String   @id @default(cuid())
+  name       String   @unique
+  costCenter String   @unique // código do centro de custo
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  users     User[]
+  tickets   Ticket[]
+  invoices  Invoice[]
+  bills     Bill[]
+  contracts Contract[]
+
+  @@map("sectors")
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  legalName String // razão social
+  tradeName String? // nome fantasia
+  cnpj      String   @unique @db.VarChar(14) // só dígitos, validado (DV) na aplicação
+  email     String?
+  phone     String?
+  notes     String?  @db.Text
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotes    Quote[]
+  invoices  Invoice[]
+  bills     Bill[]
+  contracts Contract[]
+
+  @@index([legalName])
+  @@index([active])
+  @@map("suppliers")
+}
+
+// ───────────────────────────── Chamados ─────────────────────────────
+
+model Ticket {
+  id              String       @id @default(cuid())
+  code            Int          @unique @default(autoincrement()) // "#1234"
+  type            TicketType
+  status          TicketStatus @default(OPEN)
+  urgency         Urgency      @default(MEDIUM)
+  title           String       @db.VarChar(160)
+  description     String       @db.Text
+  quantity        Int?
+  justification   String       @db.Text
+  neededBy        DateTime?    @db.Date
+  cancellationReason String?   @db.Text // obrigatório quando CANCELED (CHECK); exibido à chefia
+  sectorId        String
+  requesterId     String
+  assigneeId      String? // FINANCEIRO responsável pela avaliação
+  processingStartedAt DateTime? // entrada em IN_PROGRESS
+  closedAt        DateTime? // entrada em COMPLETED ou CANCELED (CHECK)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  sector    Sector @relation(fields: [sectorId], references: [id])
+  requester User   @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee  User?  @relation("TicketAssignee", fields: [assigneeId], references: [id])
+
+  comments      TicketComment[]
+  statusHistory TicketStatusHistory[]
+  quotes        Quote[]
+  invoices      Invoice[]
+  contract      Contract?
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@index([status, urgency])
+  @@index([sectorId, status])
+  @@index([requesterId, createdAt])
+  @@index([assigneeId, status])
+  @@index([type, status])
+  @@index([createdAt])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id         String            @id @default(cuid())
+  ticketId   String
+  authorId   String
+  visibility CommentVisibility @default(PUBLIC)
+  body       String            @db.Text
+  editedAt   DateTime?
+  createdAt  DateTime          @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [authorId], references: [id])
+
+  attachments Attachment[]
+
+  @@index([ticketId, createdAt])
+  @@index([authorId])
+  @@map("ticket_comments")
+}
+
+model TicketStatusHistory {
+  id          String        @id @default(cuid())
+  ticketId    String
+  fromStatus  TicketStatus?
+  toStatus    TicketStatus
+  changedById String
+  note        String?       @db.Text
+  createdAt   DateTime      @default(now())
+
+  ticket    Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  changedBy User   @relation(fields: [changedById], references: [id])
+
+  @@index([ticketId, createdAt])
+  @@map("ticket_status_history")
+}
+
+// ───────────────────────────── Financeiro ─────────────────────────────
+
+model Quote {
+  id           String      @id @default(cuid())
+  ticketId     String?
+  supplierId   String
+  amount       Decimal     @db.Decimal(14, 2)
+  validUntil   DateTime    @db.Date
+  status       QuoteStatus @default(PENDING)
+  description  String?     @db.Text
+  decisionNote String?     @db.Text
+  decidedById  String?
+  decidedAt    DateTime?
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
+  supplier  Supplier @relation(fields: [supplierId], references: [id])
+  decidedBy User?    @relation("QuoteDecidedBy", fields: [decidedById], references: [id])
+  createdBy User     @relation("QuoteCreatedBy", fields: [createdById], references: [id])
+
+  invoices      Invoice[]
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@index([status, validUntil])
+  @@index([supplierId])
+  @@index([ticketId])
+  @@map("quotes")
+}
+
+// A chefia envia a nota com a descrição e os anexos; número, fornecedor, emissão e valor
+// só são obrigatórios quando o FINANCEIRO lança (status POSTED) — CHECK na migration.
+model Invoice {
+  id            String        @id @default(cuid())
+  number        String?       @db.VarChar(20)
+  series        String?       @db.VarChar(5)
+  accessKey     String?       @unique @db.Char(44) // chave de acesso NF-e (do XML)
+  supplierId    String?
+  sectorId      String // setor da chefia que enviou
+  issueDate     DateTime?     @db.Date
+  amount        Decimal?      @db.Decimal(14, 2)
+  description   String        @db.Text // do que se trata a nota; obrigatório e não vazio
+  status        InvoiceStatus @default(PENDING)
+  quoteId       String?
+  contractId    String?
+  ticketId      String?
+  submittedById String // autor: a chefia vê somente as notas que ela enviou
+  postedById    String?
+  postedAt      DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  supplier    Supplier? @relation(fields: [supplierId], references: [id])
+  sector      Sector    @relation(fields: [sectorId], references: [id])
+  quote       Quote?    @relation(fields: [quoteId], references: [id])
+  contract    Contract? @relation(fields: [contractId], references: [id])
+  ticket      Ticket?   @relation(fields: [ticketId], references: [id])
+  submittedBy User      @relation("InvoiceSubmittedBy", fields: [submittedById], references: [id])
+  postedBy    User?     @relation("InvoicePostedBy", fields: [postedById], references: [id])
+
+  bills       Bill[]
+  attachments Attachment[]
+
+  @@unique([supplierId, number, series])
+  @@index([submittedById, createdAt])
+  @@index([status, createdAt])
+  @@index([issueDate])
+  @@index([sectorId, issueDate])
+  @@index([quoteId])
+  @@index([contractId])
+  @@index([ticketId])
+  @@map("invoices")
+}
+
+model Bill {
+  id            String     @id @default(cuid())
+  digitableLine String     @unique @db.VarChar(48) // só dígitos (47 boleto / 48 convênio)
+  amount        Decimal    @db.Decimal(14, 2)
+  dueDate       DateTime   @db.Date
+  status        BillStatus @default(TO_PAY)
+  installment   Int? // nº da parcela, quando houver
+  description   String?    @db.Text
+  supplierId    String
+  sectorId      String
+  invoiceId     String?
+  contractId    String?
+  paidAt        DateTime?  @db.Date // data da baixa
+  paidAmount    Decimal?   @db.Decimal(14, 2)
+  paymentNote   String?    @db.Text
+  paidById      String?
+  createdById   String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  supplier  Supplier  @relation(fields: [supplierId], references: [id])
+  sector    Sector    @relation(fields: [sectorId], references: [id])
+  invoice   Invoice?  @relation(fields: [invoiceId], references: [id])
+  contract  Contract? @relation(fields: [contractId], references: [id])
+  paidBy    User?     @relation("BillPaidBy", fields: [paidById], references: [id])
+  createdBy User      @relation("BillCreatedBy", fields: [createdById], references: [id])
+
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@index([status, dueDate])
+  @@index([dueDate])
+  @@index([supplierId, dueDate])
+  @@index([sectorId, dueDate])
+  @@index([invoiceId])
+  @@index([contractId])
+  @@map("bills")
+}
+
+model Contract {
+  id              String         @id @default(cuid())
+  code            String?        @unique // nº do contrato
+  object          String         @db.Text
+  supplierId      String
+  sectorId        String
+  monthlyValue    Decimal?       @db.Decimal(14, 2)
+  totalValue      Decimal?       @db.Decimal(14, 2)
+  startDate       DateTime       @db.Date
+  endDate         DateTime?      @db.Date // término (null = indeterminado)
+  renewalDate     DateTime?      @db.Date // próxima renovação/reajuste
+  autoRenew       Boolean        @default(false)
+  alertDaysBefore Int            @default(30)
+  status          ContractStatus @default(ACTIVE)
+  notes           String?        @db.Text
+  ticketId        String?        @unique // chamado de origem
+  createdById     String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  supplier  Supplier @relation(fields: [supplierId], references: [id])
+  sector    Sector   @relation(fields: [sectorId], references: [id])
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id])
+  createdBy User     @relation("ContractCreatedBy", fields: [createdById], references: [id])
+
+  invoices      Invoice[]
+  bills         Bill[]
+  attachments   Attachment[]
+  notifications Notification[]
+
+  @@index([status, endDate])
+  @@index([status, renewalDate])
+  @@index([supplierId])
+  @@index([sectorId])
+  @@map("contracts")
+}
+
+// ───────────────────────────── Anexos ─────────────────────────────
+
+model Attachment {
+  id           String             @id @default(cuid())
+  fileKey      String             @unique // ex.: notas-fiscais/2026/11/<uuid>.pdf
+  fileName     String // nome original (exibição/download)
+  fileType     String // MIME validado no presign
+  fileSize     Int // bytes
+  category     AttachmentCategory
+  uploadedById String
+  createdAt    DateTime           @default(now())
+
+  // Exatamente um dono (CHECK na migration, ver abaixo)
+  ticketId   String?
+  commentId  String?
+  quoteId    String?
+  invoiceId  String?
+  billId     String?
+  contractId String?
+
+  uploadedBy User           @relation(fields: [uploadedById], references: [id])
+  ticket     Ticket?        @relation(fields: [ticketId], references: [id])
+  comment    TicketComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  quote      Quote?         @relation(fields: [quoteId], references: [id])
+  invoice    Invoice?       @relation(fields: [invoiceId], references: [id])
+  bill       Bill?          @relation(fields: [billId], references: [id])
+  contract   Contract?      @relation(fields: [contractId], references: [id])
+
+  @@index([ticketId])
+  @@index([commentId])
+  @@index([quoteId])
+  @@index([invoiceId])
+  @@index([billId])
+  @@index([contractId])
+  @@map("attachments")
+}
+
+// ─────────────────────────── Notificações ───────────────────────────
+
+model Notification {
+  id         String               @id @default(cuid())
+  userId     String
+  type       NotificationType
+  severity   NotificationSeverity @default(INFO)
+  title      String
+  message    String               @db.Text
+  link       String? // rota interna, ex.: /boletos/<id>
+  dedupeKey  String // ex.: bill:<id>:DUE_SOON:2026-11-19
+  readAt     DateTime?
+  createdAt  DateTime             @default(now())
+
+  ticketId   String?
+  billId     String?
+  contractId String?
+  quoteId    String?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ticket   Ticket?   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  bill     Bill?     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  contract Contract? @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  quote    Quote?    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, readAt, createdAt])
+  @@map("notifications")
+}
