@@ -66,5 +66,8 @@ describe("políticas de upload", () => {
     expect(isAllowedMime("INVOICE_XML", "application/xml")).toBe(true);
     expect(isAllowedMime("INVOICE_PDF", "image/png")).toBe(false);
     expect(isAllowedMime("CONTRACT", "application/pdf")).toBe(true);
+    expect(isAllowedMime("BILL", "application/pdf")).toBe(true);
+    expect(isAllowedMime("BILL", "image/png")).toBe(false);
+    expect(isAllowedMime("BILL_PAYMENT_PROOF", "image/png")).toBe(true);
   });
 });

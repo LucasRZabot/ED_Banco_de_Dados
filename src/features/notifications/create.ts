@@ -11,12 +11,15 @@ type NotifyInput = {
   message: string;
   link?: string;
   ticketId?: string;
+  billId?: string;
+  contractId?: string;
+  quoteId?: string;
   dedupeKey: (userId: string) => string;
 };
 
 export async function notifyUsers(input: NotifyInput, tx: Prisma.TransactionClient = db) {
-  if (!input.userIds.length) return;
-  await tx.notification.createMany({
+  if (!input.userIds.length) return { count: 0 };
+  return tx.notification.createMany({
     skipDuplicates: true,
     data: input.userIds.map((userId) => ({
       userId,
@@ -26,6 +29,9 @@ export async function notifyUsers(input: NotifyInput, tx: Prisma.TransactionClie
       message: input.message,
       link: input.link,
       ticketId: input.ticketId,
+      billId: input.billId,
+      contractId: input.contractId,
+      quoteId: input.quoteId,
       dedupeKey: input.dedupeKey(userId),
     })),
   });

@@ -2,6 +2,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "../src/generated/prisma/client";
+import { cnpjFromBase } from "../src/lib/validators/cnpj";
 
 const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 
@@ -73,7 +74,20 @@ async function main() {
     sectorId: sectors.get("UTI Adulto")!,
   });
 
+  const suppliers = [
+    { legalName: "Hospitalar Distribuidora Ltda", tradeName: "Hospitalar", cnpj: cnpjFromBase("112223330001") },
+    { legalName: "MedSul Equipamentos Ltda", tradeName: "MedSul", cnpj: cnpjFromBase("445556660001") },
+  ];
+  for (const s of suppliers) {
+    await db.supplier.upsert({
+      where: { cnpj: s.cnpj },
+      update: { legalName: s.legalName, tradeName: s.tradeName, active: true },
+      create: s,
+    });
+  }
+
   console.log(`Setores: ${sectors.size}`);
+  console.log(`Fornecedores: ${suppliers.length}`);
   for (const { user, created } of [admin, financeiro, chefia]) {
     console.log(`${created ? "Criado" : "Já existia"}: ${user.email} (${user.role})`);
   }

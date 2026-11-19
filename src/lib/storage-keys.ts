@@ -31,7 +31,7 @@ export const CATEGORY_POLICY: Record<AttachmentCategoryKey, CategoryPolicy> = {
   QUOTE: { prefix: "orcamentos", datedPrefix: false, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO"] },
   INVOICE_PDF: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: [PDF], roles: ["FINANCEIRO", "REQUESTER"] },
   INVOICE_XML: { prefix: "notas-fiscais", datedPrefix: true, mimeTypes: XML, roles: ["FINANCEIRO", "REQUESTER"] },
-  BILL: { prefix: "boletos", datedPrefix: true, mimeTypes: [PDF, ...IMAGES], roles: ["FINANCEIRO"] },
+  BILL: { prefix: "boletos", datedPrefix: true, mimeTypes: [PDF], roles: ["FINANCEIRO"] },
   BILL_PAYMENT_PROOF: {
     prefix: "boletos",
     datedPrefix: true,

@@ -13,3 +13,8 @@ export function canViewOwnSubmission(viewer: Viewer, authorId: string) {
 }
 
 export const canViewTicket = canViewOwnSubmission;
+
+/** Boletos, orçamentos, contratos e dashboard: só a coordenação financeira. */
+export function canViewBill(viewer: Viewer) {
+  return viewer.role === "FINANCEIRO";
+}

@@ -5,9 +5,12 @@ import { AttachmentError, attachUploadedFile, canViewAttachment } from "@/lib/at
 import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { todayInTz } from "@/lib/dates";
 import { presignDownload, presignUpload } from "@/lib/s3";
 import { buildFileKey } from "@/lib/storage-keys";
 import { createUploadToken } from "@/lib/upload-token";
+import { cnpjFromBase } from "@/lib/validators/cnpj";
+import { buildBankDigitableLine } from "@/lib/validators/digitable-line";
 
 // Requer Postgres + S3 locais (docker compose up) e `npm run s3:setup`.
 const run = randomUUID().slice(0, 8);
@@ -20,6 +23,8 @@ let financeiro: CurrentUser;
 let chefiaA: CurrentUser;
 let chefiaB: CurrentUser;
 let ticketId: string;
+let supplierId: string;
+let billId: string;
 
 async function makeUser(role: "ADMIN" | "FINANCEIRO" | "REQUESTER", sectorId: string): Promise<CurrentUser> {
   const u = await db.user.create({
@@ -28,8 +33,13 @@ async function makeUser(role: "ADMIN" | "FINANCEIRO" | "REQUESTER", sectorId: st
   return { ...u, sector: null };
 }
 
-async function uploadTicketPdf(userId: string, size = pdf.length) {
-  const key = buildFileKey({ category: "TICKET", mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
+async function uploadPdf(
+  userId: string,
+  category: "TICKET" | "BILL",
+  fileName = "orçamento fornecedor.pdf",
+  size = pdf.length,
+) {
+  const key = buildFileKey({ category, mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
   const url = await presignUpload(key, "application/pdf");
   const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: pdf });
   expect(put.ok).toBe(true);
@@ -37,8 +47,8 @@ async function uploadTicketPdf(userId: string, size = pdf.length) {
     {
       key,
       userId,
-      category: "TICKET",
-      fileName: "orçamento fornecedor.pdf",
+      category,
+      fileName,
       fileType: "application/pdf",
       fileSize: size,
       exp: Math.floor(Date.now() / 1000) + 600,
@@ -46,6 +56,10 @@ async function uploadTicketPdf(userId: string, size = pdf.length) {
     env().AUTH_SECRET,
   );
   return { key, token };
+}
+
+async function uploadTicketPdf(userId: string, size = pdf.length) {
+  return uploadPdf(userId, "TICKET", "orçamento fornecedor.pdf", size);
 }
 
 beforeAll(async () => {
@@ -68,12 +82,31 @@ beforeAll(async () => {
       },
     })
   ).id;
+  supplierId = (
+    await db.supplier.create({
+      data: { legalName: `Fornecedor anexos ${run}`, cnpj: cnpjFromBase(`77${Date.now().toString().slice(-10)}`) },
+    })
+  ).id;
+  billId = (
+    await db.bill.create({
+      data: {
+        digitableLine: buildBankDigitableLine({ free: Date.now().toString().padEnd(25, "0") }),
+        amount: "10.00",
+        dueDate: todayInTz(),
+        supplierId,
+        sectorId: sectorA,
+        createdById: financeiro.id,
+      },
+    })
+  ).id;
 });
 
 afterAll(async () => {
   const ids = [admin.id, financeiro.id, chefiaA.id, chefiaB.id];
   await db.attachment.deleteMany({ where: { uploadedById: { in: ids } } });
   await db.invoice.deleteMany({ where: { submittedById: { in: ids } } });
+  if (billId) await db.bill.deleteMany({ where: { id: billId } });
+  if (supplierId) await db.supplier.deleteMany({ where: { id: supplierId } });
   await db.ticket.deleteMany({ where: { requesterId: { in: [chefiaA.id, chefiaB.id] } } });
   await db.user.deleteMany({ where: { id: { in: ids } } });
   await db.sector.deleteMany({ where: { id: { in: [sectorA, sectorB] } } });
@@ -96,6 +129,7 @@ describe("anexos com S3 presigned", () => {
     const res = await fetch(await presignDownload(att.fileKey, att.fileName, att.fileType));
     expect(res.ok).toBe(true);
     expect(Buffer.from(await res.arrayBuffer()).equals(pdf)).toBe(true);
+    expect(res.headers.get("content-disposition")).toMatch(/^inline;/);
     expect(res.headers.get("content-disposition")).toContain("filename*=UTF-8''or%C3%A7amento");
 
     await expect(attachUploadedFile(token, chefiaA, { ticketId })).rejects.toThrow(); // fileKey único
@@ -203,6 +237,33 @@ describe("anexos com S3 presigned", () => {
     });
     expect(pending.status).toBe("PENDING");
     await expect(db.invoice.update({ where: { id: pending.id }, data: { status: "POSTED" } })).rejects.toThrow();
+  });
+
+  it("anexa o PDF do boleto e o presigned GET abre inline (download só com ?download=1)", async () => {
+    const { key, token } = await uploadPdf(financeiro.id, "BILL", "boleto-itau.pdf");
+    const att = await attachUploadedFile(token, financeiro, { billId }, ["BILL"]);
+    expect(att).toMatchObject({ fileKey: key, category: "BILL", billId, fileName: "boleto-itau.pdf" });
+    expect(key).toMatch(/^boletos\/\d{4}\/\d{2}\/[0-9a-f-]{36}\.pdf$/);
+
+    expect((await canViewAttachment(financeiro, att.id)).allowed).toBe(true);
+    expect((await canViewAttachment(chefiaA, att.id)).allowed).toBe(false);
+    expect((await canViewAttachment(admin, att.id)).allowed).toBe(false);
+
+    const inlineUrl = await presignDownload(att.fileKey, att.fileName, att.fileType);
+    const forceDownloadUrl = await presignDownload(att.fileKey, att.fileName, att.fileType, {
+      disposition: "attachment",
+    });
+    expect(decodeURIComponent(inlineUrl)).toMatch(/response-content-disposition=inline;/);
+    expect(decodeURIComponent(forceDownloadUrl)).toMatch(/response-content-disposition=attachment;/);
+
+    const inline = await fetch(inlineUrl);
+    expect(inline.ok).toBe(true);
+    expect(inline.headers.get("content-disposition")).toMatch(/^inline;/);
+    expect(inline.headers.get("content-type")).toMatch(/pdf/);
+    expect(Buffer.from(await inline.arrayBuffer()).equals(pdf)).toBe(true);
+
+    const downloaded = await fetch(forceDownloadUrl);
+    expect(downloaded.headers.get("content-disposition")).toMatch(/^attachment;/);
   });
 
   it("banco recusa chefia sem setor (CHECK)", async () => {
