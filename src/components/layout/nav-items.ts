@@ -1,5 +1,6 @@
 import {
   Banknote,
+  Bell,
   ClipboardList,
   FileSignature,
   FileText,
@@ -28,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ["FINANCEIRO"] },
       { title: "Chamados", href: "/chamados", icon: ClipboardList, roles: ["FINANCEIRO", "REQUESTER"] },
+      { title: "Notificações", href: "/notificacoes", icon: Bell, roles: ["FINANCEIRO", "REQUESTER"] },
     ],
   },
   {

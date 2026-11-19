@@ -13,7 +13,8 @@ Prisma 7 + PostgreSQL · Auth.js v5 (Credentials, sessão JWT) · S3 privado com
 |---|---|---|
 | 1 | Projeto, schema completo + migration, S3 (presign de upload, download autorizado) | ✅ |
 | 2 | Login, troca de senha obrigatória, RBAC, layout com sidebar, gestão de usuários e setores | ✅ |
-| 3+ | Chamados, Boletos/Vencimentos, NFs, Orçamentos, Contratos, Dashboard | próximas |
+| 3 | Chamados (abertura, avaliação, comentários, notificações) | ✅ |
+| 4+ | Boletos/Vencimentos, NFs, Orçamentos, Contratos, Dashboard | próximas |
 
 ## Perfis
 
@@ -80,7 +81,9 @@ src/lib/storage-keys.ts  prefixos notas-fiscais/YYYY/MM, boletos/YYYY/MM, orcame
 src/lib/upload-token.ts  token HMAC que amarra key ↔ usuário ↔ arquivo
 src/lib/attachments.ts   attachUploadedFile (valida token + HeadObject) e canViewAttachment
 src/app/(auth)/        login, alterar-senha, actions de sessão
-src/app/(app)/         layout com sidebar, dashboard, chamados, admin/usuarios, admin/setores
+src/app/(app)/         layout com sidebar, dashboard, chamados, notificacoes, admin/usuarios, admin/setores
+src/features/tickets   abertura, lista, detalhe, máquina de status, comentários
+src/features/notifications  sino, página, fan-out idempotente
 src/app/api/uploads/presign  POST → URL de upload + uploadToken
 src/app/api/files/[id]       GET → checa permissão → 302 para URL assinada (5 min)
 ```

@@ -23,6 +23,7 @@ export const ROUTE_ACCESS: { prefix: string; roles: readonly AppRole[] }[] = [
   { prefix: "/boletos", roles: ["FINANCEIRO"] },
   { prefix: "/contratos", roles: ["FINANCEIRO"] },
   { prefix: "/chamados", roles: ["FINANCEIRO", "REQUESTER"] },
+  { prefix: "/notificacoes", roles: ["FINANCEIRO", "REQUESTER"] },
 ];
 
 export function canAccessPath(role: AppRole | undefined, pathname: string) {
