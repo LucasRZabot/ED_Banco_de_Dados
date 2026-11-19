@@ -13,6 +13,8 @@ import { parseNfeXml } from "@/lib/nfe-xml";
 import { getObjectText } from "@/lib/s3";
 import { verifyUploadToken } from "@/lib/upload-token";
 import { env } from "@/lib/env";
+import { completeLinkedTicket } from "@/features/tickets/complete";
+import { TicketFlowError } from "@/features/tickets/status-machine";
 import { postInvoiceSchema, submitInvoiceSchema } from "./schemas";
 
 export type InvoiceFormState =
@@ -125,7 +127,7 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
 
   const invoice = await db.invoice.findUnique({
     where: { id: parsed.data.invoiceId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, quoteId: true, ticketId: true },
   });
   if (!invoice) return { error: "Nota não encontrada." };
   if (invoice.status === "CANCELED") return { error: "Esta nota foi cancelada." };
@@ -140,6 +142,8 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
   const accessKey = parsed.data.accessKey ?? xmlHint?.accessKey ?? null;
   const supplierLegalName = parsed.data.supplierLegalName ?? xmlHint?.supplierLegalName ?? null;
   const supplierCnpj = parsed.data.supplierCnpj ?? xmlHint?.supplierCnpj ?? null;
+  const quoteId = parsed.data.quoteId ?? invoice.quoteId;
+  const ticketId = parsed.data.ticketId ?? invoice.ticketId;
 
   try {
     await db.$transaction(async (tx) => {
@@ -157,9 +161,9 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
           amount: parsed.data.amount.toFixed(2),
           issueDate: parseDateOnly(parsed.data.issueDate),
           supplierId,
-          quoteId: parsed.data.quoteId,
+          quoteId,
           contractId: parsed.data.contractId,
-          ticketId: parsed.data.ticketId,
+          ticketId,
           status: "POSTED",
           postedById: user.id,
           postedAt: new Date(),
@@ -167,9 +171,11 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
       });
       await attachTokens(pdfTokens, user, invoice.id, ["INVOICE_PDF"], tx);
       await attachTokens(xmlTokens, user, invoice.id, ["INVOICE_XML"], tx);
+      if (ticketId) await completeLinkedTicket(tx, ticketId, user.id);
     });
   } catch (err) {
     if (err instanceof InvoiceActionError) return { error: err.message };
+    if (err instanceof TicketFlowError) return { error: err.message };
     if (err instanceof AttachmentError) return { error: err.message };
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
       const target = JSON.stringify(err.meta?.target ?? "");
@@ -183,6 +189,10 @@ export async function postInvoice(_prev: InvoiceFormState, formData: FormData): 
   revalidatePath("/notas-fiscais");
   revalidatePath(`/notas-fiscais/${invoice.id}`);
   revalidatePath("/dashboard");
+  revalidatePath("/chamados");
+  revalidatePath("/orcamentos");
+  if (ticketId) revalidatePath(`/chamados/${ticketId}`);
+  if (quoteId) revalidatePath(`/orcamentos/${quoteId}`);
   redirect(`/notas-fiscais/${invoice.id}`);
 }
 

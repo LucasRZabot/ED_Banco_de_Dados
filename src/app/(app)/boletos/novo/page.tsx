@@ -22,7 +22,8 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
   await requireFinance();
   const raw = await searchParams;
   const invoiceId = typeof raw.invoiceId === "string" ? raw.invoiceId : undefined;
-  const [sectors, suppliers, invoice] = await Promise.all([
+  const quoteId = typeof raw.quoteId === "string" ? raw.quoteId : undefined;
+  const [sectors, suppliers, invoice, quote] = await Promise.all([
     listSectorsForBills(),
     listSuppliersForBills(),
     invoiceId
@@ -38,8 +39,22 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
           },
         })
       : Promise.resolve(null),
+    quoteId
+      ? db.quote.findUnique({
+          where: { id: quoteId },
+          select: {
+            id: true,
+            status: true,
+            amount: true,
+            description: true,
+            supplierId: true,
+            ticket: { select: { sectorId: true } },
+          },
+        })
+      : Promise.resolve(null),
   ]);
   const fromPosted = invoice?.status === "POSTED" ? invoice : null;
+  const fromQuote = !fromPosted && quote?.status === "APPROVED" ? quote : null;
 
   return (
     <>
@@ -48,7 +63,9 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
         description={
           fromPosted
             ? "Boleto vinculado à nota lançada. Confira valor, setor e fornecedor."
-            : "Linha digitável, valor, vencimento, setor, fornecedor e o PDF do boleto para a coordenação abrir e visualizar."
+            : fromQuote
+              ? "Boleto a partir do orçamento aprovado. Confira valor, setor e fornecedor."
+              : "Linha digitável, valor, vencimento, setor, fornecedor e o PDF do boleto para a coordenação abrir e visualizar."
         }
       />
       <BillForm
@@ -66,7 +83,17 @@ async function NewBillContent({ searchParams }: { searchParams: PageProps<"/bole
                 sectorId: fromPosted.sectorId,
                 supplierId: fromPosted.supplierId ?? "",
               }
-            : undefined
+            : fromQuote
+              ? {
+                  digitableLine: "",
+                  amount: Number(fromQuote.amount).toFixed(2).replace(".", ","),
+                  dueDate: toDateInputValue(new Date()),
+                  description: fromQuote.description ?? "",
+                  installment: "",
+                  sectorId: fromQuote.ticket?.sectorId ?? "",
+                  supplierId: fromQuote.supplierId,
+                }
+              : undefined
         }
       />
     </>

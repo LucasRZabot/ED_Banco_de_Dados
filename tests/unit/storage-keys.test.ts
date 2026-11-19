@@ -57,7 +57,10 @@ describe("políticas de upload", () => {
     expect(canUploadCategory("REQUESTER", "INVOICE_PDF")).toBe(true);
     expect(canUploadCategory("REQUESTER", "INVOICE_XML")).toBe(true);
     expect(canUploadCategory("REQUESTER", "BILL")).toBe(false);
+    expect(canUploadCategory("REQUESTER", "QUOTE")).toBe(false);
+    expect(canUploadCategory("FINANCEIRO", "QUOTE")).toBe(true);
     expect(canUploadCategory("FINANCEIRO", "CONTRACT")).toBe(true);
+    expect(canUploadCategory("ADMIN", "QUOTE")).toBe(false);
     expect(canUploadCategory("ADMIN", "INVOICE_PDF")).toBe(false);
     expect(canUploadCategory("ADMIN", "TICKET")).toBe(false);
   });

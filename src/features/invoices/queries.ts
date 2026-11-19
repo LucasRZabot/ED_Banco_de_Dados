@@ -96,9 +96,10 @@ export async function listSuppliersForInvoices() {
   });
 }
 
-export async function listLinksForPost() {
+export async function listLinksForPost(opts?: { quoteId?: string | null; ticketId?: string | null }) {
   const [quotes, contracts, tickets] = await Promise.all([
     db.quote.findMany({
+      where: opts?.quoteId ? { OR: [{ status: "APPROVED" }, { id: opts.quoteId }] } : { status: "APPROVED" },
       orderBy: { createdAt: "desc" },
       take: 80,
       select: {
@@ -115,11 +116,17 @@ export async function listLinksForPost() {
       select: { id: true, object: true, code: true, supplier: { select: { legalName: true } } },
     }),
     db.ticket.findMany({
-      where: { status: { in: ["OPEN", "IN_PROGRESS"] } },
+      where: opts?.ticketId
+        ? { OR: [{ status: { in: ["OPEN", "IN_PROGRESS"] } }, { id: opts.ticketId }] }
+        : { status: { in: ["OPEN", "IN_PROGRESS"] } },
       orderBy: { createdAt: "desc" },
       take: 80,
       select: { id: true, code: true, title: true },
     }),
   ]);
-  return { quotes, contracts, tickets };
+  return {
+    quotes: quotes.map((q) => ({ ...q, amount: q.amount.toFixed(2) })),
+    contracts,
+    tickets,
+  };
 }

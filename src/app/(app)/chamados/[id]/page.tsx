@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { QuoteStatusBadge } from "@/features/quotes/components/status-badge";
+import { listQuotesForTicket } from "@/features/quotes/queries";
 import { CommentForm } from "@/features/tickets/components/comment-form";
 import { FinanceActions } from "@/features/tickets/components/finance-actions";
 import { TicketStatusBadge } from "@/features/tickets/components/status-badge";
@@ -10,7 +13,7 @@ import { COMMENT_VISIBILITY_LABELS, TICKET_STATUS_LABELS, TICKET_TYPE_LABELS, UR
 import { getTicketOrNotFound } from "@/features/tickets/queries";
 import type { CommentVisibility, TicketStatus, TicketType, Urgency } from "@/features/tickets/status-machine";
 import { requireRole } from "@/lib/dal";
-import { formatDate, formatDateTime, formatFileSize, ticketCode } from "@/lib/format";
+import { formatBRL, formatDate, formatDateOnly, formatDateTime, formatFileSize, ticketCode } from "@/lib/format";
 
 export const metadata: Metadata = { title: "Chamado" };
 
@@ -21,6 +24,8 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
   const ticket = await getTicketOrNotFound(user, id);
   const status = ticket.status as TicketStatus;
   const showResult = user.role === "REQUESTER";
+  const quotes =
+    user.role === "FINANCEIRO" && ticket.type === "PURCHASE_QUOTE" ? await listQuotesForTicket(ticket.id) : [];
 
   return (
     <div className="grid gap-6">
@@ -34,7 +39,9 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
             <Badge variant="outline">{URGENCY_LABELS[ticket.urgency as Urgency]}</Badge>
           </div>
         </div>
-        {user.role === "FINANCEIRO" ? <FinanceActions ticketId={ticket.id} status={status} /> : null}
+        {user.role === "FINANCEIRO" ? (
+          <FinanceActions ticketId={ticket.id} status={status} type={ticket.type as TicketType} />
+        ) : null}
       </div>
 
       {status === "CANCELED" && ticket.cancellationReason ? (
@@ -79,6 +86,41 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
           </CardContent>
         </Card>
       </div>
+
+      {user.role === "FINANCEIRO" && ticket.type === "PURCHASE_QUOTE" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Orçamentos deste chamado</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {quotes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum orçamento cadastrado ainda.</p>
+            ) : (
+              quotes.map((q) => (
+                <Link
+                  key={q.id}
+                  href={`/orcamentos/${q.id}`}
+                  className="grid gap-1 rounded-lg border p-3 text-sm hover:bg-muted/40"
+                >
+                  <p className="font-medium">{q.supplier.legalName}</p>
+                  <p className="text-xl font-semibold tabular-nums">{formatBRL(q.amount)}</p>
+                  <QuoteStatusBadge status={q.status} />
+                  <p className="text-xs text-muted-foreground">Válido até {formatDateOnly(q.validUntil)}</p>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {user.role === "FINANCEIRO" && ticket.type === "CONTRACT_INCLUSION" ? (
+        <Alert>
+          <AlertTitle>Contrato — Etapa 7</AlertTitle>
+          <AlertDescription>
+            A conversão deste chamado em contrato ainda não tem tela. O gancho fica registrado para a Etapa 7.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

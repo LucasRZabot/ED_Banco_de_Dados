@@ -19,3 +19,5 @@ export const canViewInvoice = canViewOwnSubmission;
 export function canViewBill(viewer: Viewer) {
   return viewer.role === "FINANCEIRO";
 }
+
+export const canViewQuote = canViewBill;

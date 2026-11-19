@@ -42,7 +42,10 @@ async function InvoiceDetail({ params }: { params: PageProps<"/notas-fiscais/[id
   const issue = invoice.issueDate ? toDateInputValue(invoice.issueDate) : undefined;
 
   const xmlPrefill = xmls[0] ? await prefillFromXmlAttachment(xmls[0].fileKey) : null;
-  const links = finance && invoice.status === "PENDING" ? await listLinksForPost() : { quotes: [], contracts: [], tickets: [] };
+  const links =
+    finance && invoice.status === "PENDING"
+      ? await listLinksForPost({ quoteId: invoice.quoteId, ticketId: invoice.ticketId })
+      : { quotes: [], contracts: [], tickets: [] };
   const suppliers = finance && invoice.status === "PENDING" ? await listSuppliersForInvoices() : [];
 
   const matchedSupplier = xmlPrefill?.supplierCnpj
@@ -80,6 +83,14 @@ async function InvoiceDetail({ params }: { params: PageProps<"/notas-fiscais/[id
               <Field label="Enviada em" value={formatDate(invoice.createdAt)} />
               <Field label="Enviada por" value={invoice.submittedBy.name ?? invoice.submittedBy.email ?? "—"} />
             </div>
+            {invoice.status !== "POSTED" && invoice.quote ? (
+              <div className="grid gap-1">
+                <p className="text-xs text-muted-foreground">Convertida do orçamento</p>
+                <Link href={`/orcamentos/${invoice.quote.id}`} className="text-primary hover:underline">
+                  {invoice.quote.description ?? formatBRL(invoice.quote.amount)}
+                </Link>
+              </div>
+            ) : null}
             {invoice.status === "POSTED" ? (
               <>
                 <div className="grid gap-4 sm:grid-cols-3">
@@ -96,7 +107,12 @@ async function InvoiceDetail({ params }: { params: PageProps<"/notas-fiscais/[id
                 </div>
                 {invoice.accessKey ? <Field label="Chave de acesso" value={invoice.accessKey} mono /> : null}
                 {invoice.quote ? (
-                  <Field label="Orçamento" value={invoice.quote.description ?? invoice.quote.id} />
+                  <div className="grid gap-1">
+                    <p className="text-xs text-muted-foreground">Orçamento</p>
+                    <Link href={`/orcamentos/${invoice.quote.id}`} className="text-primary hover:underline">
+                      {invoice.quote.description ?? formatBRL(invoice.quote.amount)}
+                    </Link>
+                  </div>
                 ) : null}
                 {invoice.contract ? (
                   <Field
