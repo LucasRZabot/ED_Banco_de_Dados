@@ -73,12 +73,15 @@ export function ConvertQuoteForm({
       </div>
 
       <Alert>
-        <AlertTitle>Contrato — Etapa 7</AlertTitle>
+        <AlertTitle>Converter em contrato</AlertTitle>
         <AlertDescription>
-          A conversão deste orçamento em contrato (chamado de inclusão) ainda não tem tela. O gancho fica registrado aqui
-          para a Etapa 7.
+          Se esta proposta virar contrato, abra o cadastro já com fornecedor e valor. Chamados de inclusão também
+          convertem direto pela tela do chamado.
         </AlertDescription>
       </Alert>
+      <Button nativeButton={false} variant="outline" render={<Link href={`/contratos/novo?quoteId=${quoteId}`} />}>
+        Converter em contrato
+      </Button>
     </form>
   );
 }

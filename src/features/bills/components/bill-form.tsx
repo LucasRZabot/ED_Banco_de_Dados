@@ -31,6 +31,7 @@ export function BillForm({
   draft,
   existingPdfs = [],
   invoiceId,
+  contractId,
 }: {
   sectors: Sector[];
   suppliers: Supplier[];
@@ -38,6 +39,7 @@ export function BillForm({
   draft?: Omit<BillFormValues, "id">;
   existingPdfs?: { id: string; fileName: string; fileSize: number }[];
   invoiceId?: string;
+  contractId?: string;
 }) {
   const editing = Boolean(bill?.id);
   const initial = bill ?? draft;
@@ -54,6 +56,7 @@ export function BillForm({
     <form action={formAction} className="grid max-w-2xl gap-4">
       {editing ? <input type="hidden" name="billId" value={bill!.id} /> : null}
       {invoiceId ? <input type="hidden" name="invoiceId" value={invoiceId} /> : null}
+      {contractId ? <input type="hidden" name="contractId" value={contractId} /> : null}
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
 
       <div className="grid gap-2">

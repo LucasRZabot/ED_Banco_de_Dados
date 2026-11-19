@@ -68,10 +68,12 @@ async function QuoteDetail({ params }: { params: PageProps<"/orcamentos/[id]">["
 
       {quote.ticket?.type === "CONTRACT_INCLUSION" ? (
         <Alert>
-          <AlertTitle>Inclusão de contrato — Etapa 7</AlertTitle>
+          <AlertTitle>Inclusão de contrato</AlertTitle>
           <AlertDescription>
-            Este chamado é de inclusão de contrato. A conversão em contrato ainda não tem tela; o gancho fica para a
-            Etapa 7.
+            Este chamado é de inclusão.{" "}
+            <Link href={`/contratos/novo?ticketId=${quote.ticket.id}&quoteId=${quote.id}`} className="text-primary hover:underline">
+              Converter em contrato
+            </Link>
           </AlertDescription>
         </Alert>
       ) : null}
@@ -201,15 +203,6 @@ async function QuoteDetail({ params }: { params: PageProps<"/orcamentos/[id]">["
             />
           </CardContent>
         </Card>
-      ) : null}
-
-      {quote.status === "REJECTED" && !quote.ticketId ? (
-        <Alert>
-          <AlertTitle>Contrato — Etapa 7</AlertTitle>
-          <AlertDescription>
-            A conversão em contrato (chamado de inclusão) ainda não tem tela. O gancho fica para a Etapa 7.
-          </AlertDescription>
-        </Alert>
       ) : null}
 
       <Button nativeButton={false} variant="outline" render={<Link href="/orcamentos" />}>

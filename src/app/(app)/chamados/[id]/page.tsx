@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getContractByTicketId } from "@/features/contracts/queries";
 import { QuoteStatusBadge } from "@/features/quotes/components/status-badge";
 import { listQuotesForTicket } from "@/features/quotes/queries";
 import { CommentForm } from "@/features/tickets/components/comment-form";
@@ -26,6 +27,8 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
   const showResult = user.role === "REQUESTER";
   const quotes =
     user.role === "FINANCEIRO" && ticket.type === "PURCHASE_QUOTE" ? await listQuotesForTicket(ticket.id) : [];
+  const linkedContract =
+    user.role === "FINANCEIRO" && ticket.type === "CONTRACT_INCLUSION" ? await getContractByTicketId(ticket.id) : null;
 
   return (
     <div className="grid gap-6">
@@ -40,7 +43,12 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
           </div>
         </div>
         {user.role === "FINANCEIRO" ? (
-          <FinanceActions ticketId={ticket.id} status={status} type={ticket.type as TicketType} />
+          <FinanceActions
+            ticketId={ticket.id}
+            status={status}
+            type={ticket.type as TicketType}
+            contractId={linkedContract?.id}
+          />
         ) : null}
       </div>
 
@@ -113,11 +121,14 @@ export default async function TicketDetailPage({ params }: PageProps<"/chamados/
         </Card>
       ) : null}
 
-      {user.role === "FINANCEIRO" && ticket.type === "CONTRACT_INCLUSION" ? (
+      {user.role === "FINANCEIRO" && ticket.type === "CONTRACT_INCLUSION" && linkedContract ? (
         <Alert>
-          <AlertTitle>Contrato — Etapa 7</AlertTitle>
+          <AlertTitle>Contrato gerado</AlertTitle>
           <AlertDescription>
-            A conversão deste chamado em contrato ainda não tem tela. O gancho fica registrado para a Etapa 7.
+            <Link href={`/contratos/${linkedContract.id}`} className="text-primary hover:underline">
+              {linkedContract.code ? `${linkedContract.code} · ` : ""}
+              {linkedContract.object}
+            </Link>
           </AlertDescription>
         </Alert>
       ) : null}

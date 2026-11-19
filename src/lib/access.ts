@@ -21,3 +21,4 @@ export function canViewBill(viewer: Viewer) {
 }
 
 export const canViewQuote = canViewBill;
+export const canViewContract = canViewBill;
