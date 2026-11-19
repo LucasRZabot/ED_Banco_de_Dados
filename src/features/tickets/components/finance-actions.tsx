@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import { FieldError } from "@/components/shared/field-error";
 import { Button } from "@/components/ui/button";
@@ -14,17 +15,33 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { changeTicketStatus } from "../actions";
-import { TRANSITIONS, type TicketStatus } from "../status-machine";
+import { TRANSITIONS, type TicketStatus, type TicketType } from "../status-machine";
 
-export function FinanceActions({ ticketId, status }: { ticketId: string; status: TicketStatus }) {
+export function FinanceActions({
+  ticketId,
+  status,
+  type,
+}: {
+  ticketId: string;
+  status: TicketStatus;
+  type: TicketType;
+}) {
   const next = TRANSITIONS[status];
   const [cancelOpen, setCancelOpen] = useState(false);
   const [state, action, pending] = useActionState(changeTicketStatus, undefined);
 
-  if (!next.length) return null;
-
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {type === "PURCHASE_QUOTE" && status !== "CANCELED" && status !== "COMPLETED" ? (
+        <Button nativeButton={false} variant="outline" render={<Link href={`/orcamentos/novo?ticketId=${ticketId}`} />}>
+          Novo orçamento
+        </Button>
+      ) : null}
+      {type === "CONTRACT_INCLUSION" && status !== "CANCELED" && status !== "COMPLETED" ? (
+        <Button type="button" variant="outline" disabled title="A conversão em contrato entra na Etapa 7.">
+          Converter em contrato (Etapa 7)
+        </Button>
+      ) : null}
       {state?.error ? <p className="w-full text-sm text-destructive">{state.error}</p> : null}
       {next.includes("IN_PROGRESS") ? (
         <form action={action}>

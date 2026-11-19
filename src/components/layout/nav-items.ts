@@ -35,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     label: "Financeiro",
     items: [
-      { title: "Orçamentos", href: "/orcamentos", icon: FileText, roles: ["FINANCEIRO"], soon: true },
+      { title: "Orçamentos", href: "/orcamentos", icon: FileText, roles: ["FINANCEIRO"] },
       { title: "Notas Fiscais", href: "/notas-fiscais", icon: Receipt, roles: ["FINANCEIRO", "REQUESTER"] },
       { title: "Boletos", href: "/boletos", icon: Banknote, roles: ["FINANCEIRO"] },
       { title: "Contratos", href: "/contratos", icon: FileSignature, roles: ["FINANCEIRO"], soon: true },

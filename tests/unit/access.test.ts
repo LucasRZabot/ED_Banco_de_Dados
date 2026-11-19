@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canViewBill, canViewInvoice, canViewOwnSubmission } from "@/lib/access";
+import { canViewBill, canViewInvoice, canViewOwnSubmission, canViewQuote } from "@/lib/access";
 
 describe("visibilidade da chefia", () => {
   it("financeiro vê qualquer envio e a chefia só o próprio", () => {
@@ -20,5 +20,11 @@ describe("visibilidade da chefia", () => {
     expect(canViewBill({ id: "fin", role: "FINANCEIRO" })).toBe(true);
     expect(canViewBill({ id: "chefia", role: "REQUESTER" })).toBe(false);
     expect(canViewBill({ id: "ti", role: "ADMIN" })).toBe(false);
+  });
+
+  it("só o financeiro vê orçamentos", () => {
+    expect(canViewQuote({ id: "fin", role: "FINANCEIRO" })).toBe(true);
+    expect(canViewQuote({ id: "chefia", role: "REQUESTER" })).toBe(false);
+    expect(canViewQuote({ id: "ti", role: "ADMIN" })).toBe(false);
   });
 });
