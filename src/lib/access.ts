@@ -13,6 +13,7 @@ export function canViewOwnSubmission(viewer: Viewer, authorId: string) {
 }
 
 export const canViewTicket = canViewOwnSubmission;
+export const canViewInvoice = canViewOwnSubmission;
 
 /** Boletos, orçamentos, contratos e dashboard: só a coordenação financeira. */
 export function canViewBill(viewer: Viewer) {

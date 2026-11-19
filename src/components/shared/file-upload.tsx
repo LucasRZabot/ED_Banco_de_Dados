@@ -14,6 +14,7 @@ export function FileUpload({
   multiple = true,
   referenceDate,
   onBusyChange,
+  onPicked,
 }: {
   name?: string;
   category: AttachmentCategoryKey;
@@ -22,6 +23,7 @@ export function FileUpload({
   /** YYYY-MM-DD: mês do vencimento/emissão na key do S3. */
   referenceDate?: string;
   onBusyChange?: (busy: boolean) => void;
+  onPicked?: (file: File) => void | Promise<void>;
 }) {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [error, setError] = useState<string>();
@@ -36,6 +38,7 @@ export function FileUpload({
     try {
       const uploaded: UploadedFile[] = [];
       for (const file of Array.from(list)) {
+        await onPicked?.(file);
         uploaded.push(await uploadFile(file, category, referenceDate));
       }
       setFiles((current) => (multiple ? [...current, ...uploaded] : uploaded));

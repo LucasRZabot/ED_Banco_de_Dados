@@ -55,6 +55,11 @@ export const createBillSchema = z
       .trim()
       .optional()
       .transform((v) => (v ? onlyDigits(v) : null)),
+    invoiceId: z
+      .string()
+      .trim()
+      .optional()
+      .transform((v) => (v ? v : null)),
   })
   .superRefine((data, ctx) => {
     if (data.supplierId) return;
