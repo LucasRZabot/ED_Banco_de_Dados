@@ -8,6 +8,8 @@ const schema = z.object({
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET precisa ter pelo menos 32 caracteres"),
   AUTH_SESSION_MAX_AGE_HOURS: z.coerce.number().int().positive().default(10),
   APP_TIMEZONE: z.string().default("America/Sao_Paulo"),
+  ALERT_WARNING_DAYS: z.coerce.number().int().min(1).max(30).default(5),
+  CRON_SECRET: z.string().min(16, "CRON_SECRET precisa ter pelo menos 16 caracteres"),
   AWS_REGION: z.string().min(1),
   S3_BUCKET: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.preprocess(emptyToUndefined, z.string().optional()),

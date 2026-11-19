@@ -14,7 +14,8 @@ Prisma 7 + PostgreSQL · Auth.js v5 (Credentials, sessão JWT) · S3 privado com
 | 1 | Projeto, schema completo + migration, S3 (presign de upload, download autorizado) | ✅ |
 | 2 | Login, troca de senha obrigatória, RBAC, layout com sidebar, gestão de usuários e setores | ✅ |
 | 3 | Chamados (abertura, avaliação, comentários, notificações) | ✅ |
-| 4+ | Boletos/Vencimentos, NFs, Orçamentos, Contratos, Dashboard | próximas |
+| 4 | Boletos, cron de vencimentos e dashboard v1 | ✅ |
+| 5+ | NFs, Orçamentos, Contratos, dashboard completo | próximas |
 
 ## Perfis
 
@@ -66,6 +67,12 @@ E-mails e senhas vêm de `SEED_*` no `.env`. O seed não sobrescreve contas exis
 | `npm run db:seed` | setores de exemplo + admin, financeiro e chefia |
 | `npm run s3:setup` | cria bucket privado, bloqueio público e CORS para `APP_URL` |
 
+Cron diário (hoje em `America/Sao_Paulo`):
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/check-deadlines
+```
+
 ## Estrutura
 
 ```
@@ -81,9 +88,13 @@ src/lib/storage-keys.ts  prefixos notas-fiscais/YYYY/MM, boletos/YYYY/MM, orcame
 src/lib/upload-token.ts  token HMAC que amarra key ↔ usuário ↔ arquivo
 src/lib/attachments.ts   attachUploadedFile (valida token + HeadObject) e canViewAttachment
 src/app/(auth)/        login, alterar-senha, actions de sessão
-src/app/(app)/         layout com sidebar, dashboard, chamados, notificacoes, admin/usuarios, admin/setores
+src/app/(app)/         layout com sidebar, dashboard, chamados, boletos, notificacoes, admin/usuarios, admin/setores
 src/features/tickets   abertura, lista, detalhe, máquina de status, comentários
+src/features/bills     cadastro, lista, baixa, filtros
+src/features/dashboard cards de vencimento
 src/features/notifications  sino, página, fan-out idempotente
+src/server/jobs        check-deadlines (cron HTTP)
+src/lib/validators     CNPJ e linha digitável
 src/app/api/uploads/presign  POST → URL de upload + uploadToken
 src/app/api/files/[id]       GET → checa permissão → 302 para URL assinada (5 min)
 ```
