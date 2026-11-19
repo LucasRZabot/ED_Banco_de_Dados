@@ -1,6 +1,7 @@
 import "server-only";
 import {
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   NotFound,
   PutObjectCommand,
@@ -63,6 +64,10 @@ export async function presignDownload(
 export async function getObjectText(key: string) {
   const res = await s3().send(new GetObjectCommand({ Bucket: env().S3_BUCKET, Key: key }));
   return res.Body ? await res.Body.transformToString() : "";
+}
+
+export async function headBucket() {
+  await s3().send(new HeadBucketCommand({ Bucket: env().S3_BUCKET }));
 }
 
 export async function headObject(key: string) {

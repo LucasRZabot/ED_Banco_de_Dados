@@ -15,7 +15,11 @@ Prisma 7 + PostgreSQL · Auth.js v5 (Credentials, sessão JWT) · S3 privado com
 | 2 | Login, troca de senha obrigatória, RBAC, layout com sidebar, gestão de usuários e setores | ✅ |
 | 3 | Chamados (abertura, avaliação, comentários, notificações) | ✅ |
 | 4 | Boletos, cron de vencimentos e dashboard v1 | ✅ |
-| 5+ | NFs, Orçamentos, Contratos, dashboard completo | próximas |
+| 5 | Notas fiscais | ✅ |
+| 6 | Orçamentos e conversão | ✅ |
+| 7 | Contratos | ✅ |
+| 8 | Dashboard completo | ✅ |
+| 9 | Preparação para produção (health, headers, docs de deploy) | ✅ |
 
 ## Perfis
 
@@ -67,11 +71,14 @@ E-mails e senhas vêm de `SEED_*` no `.env`. O seed não sobrescreve contas exis
 | `npm run db:seed` | setores de exemplo + admin, financeiro e chefia |
 | `npm run s3:setup` | cria bucket privado, bloqueio público e CORS para `APP_URL` |
 
-Cron diário (hoje em `America/Sao_Paulo`):
+Cron diário (hoje em `America/Sao_Paulo`). Sem o Bearer o endpoint responde 401:
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/check-deadlines
+curl -s http://localhost:3000/api/health
 ```
+
+Produção (RDS, S3 privado, EventBridge, segredos): **[docs/deploy.md](docs/deploy.md)**. Este repositório não cria recursos AWS.
 
 ## Estrutura
 
@@ -111,8 +118,10 @@ src/app/api/files/[id]       GET → checa permissão → 302 para URL assinada 
 
 ## Notas de produção
 
-- RDS: `DATABASE_URL` com `sslmode=require`; rode `npm run db:deploy` no deploy.
-- S3: bucket criado via IaC, com Block Public Access, SSE e CORS só para o domínio da app. Deixe
-  `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` e `S3_ENDPOINT` vazios e use IAM role com apenas
-  `s3:PutObject` e `s3:GetObject` em `arn:aws:s3:::<bucket>/*` (o `HeadObject` usa a permissão de GetObject).
+Ver o guia completo em **[docs/deploy.md](docs/deploy.md)**. Resumo:
+
+- RDS: `DATABASE_URL` com `sslmode=require`; `npm run db:deploy` no deploy. Sem seed.
+- S3 privado + IAM role (`s3:PutObject` / `GetObject` / `HeadObject`). Chaves e `S3_ENDPOINT` vazios.
+- EventBridge diário → `POST /api/cron/check-deadlines` com `Authorization: Bearer $CRON_SECRET`.
+- Healthcheck: `GET /api/health`. Cabeçalhos de segurança no `next.config.ts`.
 - `npm ci --omit=dev` não instala a CLI do Prisma; gere o client no build (`npm ci && npm run build`).

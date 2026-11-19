@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { authenticateRequest } from "@/lib/dal";
 import { env } from "@/lib/env";
+import { clientKeyFromHeaders, presignLimiter } from "@/lib/rate-limit";
 import { presignUpload } from "@/lib/s3";
 import {
   ATTACHMENT_CATEGORIES,
@@ -24,6 +25,10 @@ const bodySchema = z.object({
 export async function POST(request: Request) {
   const { user, error } = await authenticateRequest();
   if (error) return error;
+  const limitKey = `presign:${user.id}:${clientKeyFromHeaders(request.headers)}`;
+  if (!presignLimiter.take(limitKey)) {
+    return Response.json({ error: "Muitas tentativas de upload. Aguarde um minuto." }, { status: 429 });
+  }
 
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
