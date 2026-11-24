@@ -1,6 +1,6 @@
 # Firebase App Hosting (Next.js App Router → Cloud Run + Cloud CDN).
+# Projeto: HSPinhaisFat / hspinhaisfat / 739492468790
 # Não sobrescreva `scripts.buildCommand`: isso desliga o adapter oficial do Next.js.
-# GCS_BUCKET pode ficar de fora: em runtime o App Hosting injeta FIREBASE_CONFIG.storageBucket.
 
 runConfig:
   minInstances: 0
@@ -12,6 +12,11 @@ runConfig:
 env:
   - variable: STORAGE_PROVIDER
     value: gcs
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: GCS_BUCKET
+    value: hspinhaisfat.firebasestorage.app
     availability:
       - BUILD
       - RUNTIME

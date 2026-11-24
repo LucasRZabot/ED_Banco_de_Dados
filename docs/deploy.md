@@ -1,18 +1,29 @@
 # Deploy em produção (Firebase)
 
-Este documento descreve **como** colocar o app no ar. Ele **não cria** o projeto Firebase: isso é um clique seu no console. Prisma continua no PostgreSQL gerenciado — Firestore seria reescrever o modelo.
+Este documento descreve **como** colocar o app no ar no projeto Firebase `hspinhaisfat` (já criado). Prisma continua no PostgreSQL gerenciado — Firestore seria reescrever o modelo.
 
 Runtime: Node 22, Firebase **App Hosting** (Next.js App Router em Cloud Run + CDN). Anexos no **Firebase Storage** (URLs assinadas, bucket privado). Cron diário no **Cloud Scheduler** → `POST /api/cron/check-deadlines`. Healthcheck: `GET /api/health` (200). Pronto profundo: `GET /api/health?deep=1` (também testa o bucket).
 
 Não use AWS. A publicação na AWS foi cancelada (SCP da organização).
 
+Projeto Firebase já criado:
+
+| | |
+|---|---|
+| Nome | `HSPinhaisFat` |
+| Project ID | `hspinhaisfat` |
+| Project number | `739492468790` |
+| Console | [console.firebase.google.com/project/hspinhaisfat](https://console.firebase.google.com/project/hspinhaisfat) |
+| Bucket (padrão) | `hspinhaisfat.firebasestorage.app` |
+| App Hosting (se região `us-central1` e backend `financeiro`) | `https://financeiro--hspinhaisfat.us-central1.hosted.app` |
+
 ## 1. Clique agora no Firebase
 
-1. Abra [https://console.firebase.google.com/](https://console.firebase.google.com/).
-2. Clique em **Create a project** (ou **Add project**).
-3. Nome sugerido: `financeiro-hospital`. Aceite o Google Analytics se quiser; não é obrigatório.
-4. Quando o projeto abrir: engrenagem → **Project settings** → anote o **Project ID**.
-5. No aviso de upgrade, clique em **Upgrade** para o plano **Blaze** (App Hosting e Cloud Scheduler exigem). O free tier do Blaze cobre o volume deste MVP se o scale-to-zero ficar ligado.
+O projeto já existe. Próximos cliques neste projeto (`hspinhaisfat`):
+
+1. Se ainda estiver no wizard de Storage: **Get started** → **production mode** (as rules do repo negam o SDK do cliente).
+2. No aviso de upgrade, **Upgrade** para o plano **Blaze** (App Hosting e Cloud Scheduler exigem). O free tier do Blaze cobre o volume deste MVP se o scale-to-zero ficar ligado.
+3. Depois: **Hosting & Serverless → App Hosting → Get started** (passo 5).
 
 ## 2. Postgres gerenciado (Prisma, sem Firestore)
 
@@ -29,13 +40,13 @@ Cloud SQL no mesmo projeto Google também serve; o App Hosting **não** monta o 
 
 1. No Firebase Console: **Build → Storage → Get started**.
 2. Escolha **production mode** (as rules do repositório já negam leitura/escrita pelo SDK do cliente).
-3. O bucket fica `PROJECT_ID.firebasestorage.app` (ou `PROJECT_ID.appspot.com` em projetos antigos).
+3. O bucket padrão é `hspinhaisfat.firebasestorage.app` (já pinado em `apphosting.yaml`).
 4. Depois que o App Hosting existir, rode na sua máquina (ADC, sem colar chave):
 
 ```bash
 gcloud auth application-default login
-export GCS_BUCKET=PROJECT_ID.firebasestorage.app
-export APP_URL=https://financeiro--PROJECT_ID.us-central1.hosted.app
+export GCS_BUCKET=hspinhaisfat.firebasestorage.app
+export APP_URL=https://financeiro--hspinhaisfat.us-central1.hosted.app
 npm run storage:setup:gcs
 ```
 
@@ -78,9 +89,9 @@ O repositório já tem `firebase.json` (`backendId: financeiro`), `apphosting.ya
 7. Em **Environment / Secrets**, anexe `DATABASE_URL`, `AUTH_SECRET` e `CRON_SECRET`.
 8. **Finish and deploy**.
 
-URL: `https://financeiro--PROJECT_ID.us-central1.hosted.app`.
+URL: `https://financeiro--hspinhaisfat.us-central1.hosted.app`.
 
-IAM depois do primeiro rollout (Google Cloud Console → IAM), na service account `firebase-app-hosting-compute@PROJECT_ID.iam.gserviceaccount.com`:
+IAM depois do primeiro rollout (Google Cloud Console → IAM), na service account `firebase-app-hosting-compute@hspinhaisfat.iam.gserviceaccount.com`:
 
 - `roles/storage.objectAdmin` no bucket (URLs assinadas de PUT/GET)
 - `roles/iam.serviceAccountTokenCreator` **nela mesma** (sem isso o `getSignedUrl` falha no Cloud Run)
@@ -91,10 +102,10 @@ Rules: `firebase deploy --only storage` (ou o Get started em production mode já
 
 O job HTTP já existe: `GET` ou `POST /api/cron/check-deadlines`. Sem `Authorization: Bearer <CRON_SECRET>` responde **401**.
 
-1. [Cloud Scheduler](https://console.cloud.google.com/cloudscheduler) → **Enable API** se pedido → **Create job**.
+1. [Cloud Scheduler](https://console.cloud.google.com/cloudscheduler?project=hspinhaisfat) → **Enable API** se pedido → **Create job**.
 2. Nome: `check-deadlines`. Região: a mesma do App Hosting.
 3. Frequency: `0 8 * * *`. Timezone: `America/Sao_Paulo`.
-4. Target: **HTTP**. URL: `https://financeiro--PROJECT_ID.us-central1.hosted.app/api/cron/check-deadlines`.
+4. Target: **HTTP**. URL: `https://financeiro--hspinhaisfat.us-central1.hosted.app/api/cron/check-deadlines`.
 5. Method: `POST`.
 6. Header: `Authorization` = `Bearer ` + o mesmo valor de `CRON_SECRET` (o console do Scheduler guarda o header; não cole no chat).
 7. Auth header da plataforma: **Add** (nenhum OIDC — o Bearer da aplicação já autentica).
@@ -106,7 +117,7 @@ O job é idempotente (`Notification.dedupeKey`). Rodar duas vezes no mesmo dia n
 | Variável | Produção | Notas |
 |---|---|---|
 | `STORAGE_PROVIDER` | `gcs` | Já está no `apphosting.yaml`. |
-| `GCS_BUCKET` | opcional | Sem ela, usa `FIREBASE_CONFIG.storageBucket`. |
+| `GCS_BUCKET` | `hspinhaisfat.firebasestorage.app` | Já está no `apphosting.yaml`. |
 | `APP_URL` | URL `*.hosted.app` | Só para CORS (`npm run storage:setup:gcs`). |
 | `APP_TIMEZONE` | `America/Sao_Paulo` | "Hoje" dos vencimentos e do cron. |
 | `ALERT_WARNING_DAYS` | `5` | Amarelo no dashboard. |
@@ -137,9 +148,9 @@ O seed não sobrescreve contas existentes. Troca de senha continua obrigatória 
 ## Conferência
 
 ```bash
-curl -s https://financeiro--PROJECT_ID.us-central1.hosted.app/api/health
-curl -s https://financeiro--PROJECT_ID.us-central1.hosted.app/api/health?deep=1
-curl -H "Authorization: Bearer $CRON_SECRET" https://financeiro--PROJECT_ID.us-central1.hosted.app/api/cron/check-deadlines
+curl -s https://financeiro--hspinhaisfat.us-central1.hosted.app/api/health
+curl -s https://financeiro--hspinhaisfat.us-central1.hosted.app/api/health?deep=1
+curl -H "Authorization: Bearer $CRON_SECRET" https://financeiro--hspinhaisfat.us-central1.hosted.app/api/cron/check-deadlines
 ```
 
 Cabeçalhos (`X-Frame-Options: DENY`, `nosniff`, HSTS) saem do `next.config.ts`. Rate limit em memória no login e no presign (uma instância; Redis fica para depois).
