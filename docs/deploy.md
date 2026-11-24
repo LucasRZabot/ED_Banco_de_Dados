@@ -17,8 +17,9 @@ No Cursor, bind só de nomes não reservados:
 
 | Variável | Notas |
 |---|---|
-| `AUTH_SECRET` | 32+ bytes. Sessão JWT do Auth.js. |
+| `AUTH_SECRET` | 32+ bytes. Sessão JWT do Auth.js. Sem ele o app não inicia em produção. |
 | `CRON_SECRET` | 16+ chars. Bearer de `GET`/`POST /api/cron/check-deadlines`. |
+| `BOOTSTRAP_SECRET` | 16+ chars. Código de uma vez para a TI criar o primeiro ADMIN. Sem ele o setup fica bloqueado. |
 
 Opcional no runtime (não são secretos reservados, mas também não precisam de bind):
 
@@ -37,9 +38,11 @@ Opcional no runtime (não são secretos reservados, mas também não precisam de
 `npm run build` gera o Next.js e, se `DATABASE_URL` existir, aplica `prisma migrate deploy`. Sem a URL,
 o script de migrate não faz nada. **Não roda seed em produção** — nada de `@hospital.local`.
 
-Com o banco vazio, a tela de login pede o primeiro ADMIN (TI) com e-mail real. Depois, em
+Com o banco vazio, só a TI completa o primeiro ADMIN: precisa do `BOOTSTRAP_SECRET` no host e do
+código no formulário de setup. Um visitante aleatório não vira ADMIN. Depois, em
 **Administração → Usuários**, a TI cria cada pessoa (FINANCEIRO, chefias com setor). Senha provisória
-com `mustChangePassword`. Sem auto-cadastro.
+com `mustChangePassword`. Sem auto-cadastro. XML de NF sai como anexo (`octet-stream`), nunca como
+HTML no navegador.
 
 Health: `GET /api/health` (Postgres). Pronto profundo: `GET /api/health?deep=1` (tabela `file_blobs`).
 

@@ -2,7 +2,7 @@ export type RateLimiter = {
   take(key: string, now?: number): boolean;
 };
 
-/** Janela deslizante em memória. Serve para uma instância (ECS/EC2); multi-réplica pede Redis. */
+/** Janela deslizante em memória. Serve para uma instância; multi-réplica pede Redis. */
 export function createRateLimiter(opts: { windowMs: number; max: number }): RateLimiter {
   const hits = new Map<string, number[]>();
   return {
@@ -20,10 +20,14 @@ export function createRateLimiter(opts: { windowMs: number; max: number }): Rate
   };
 }
 
+/**
+ * IP do hop confiável do host. Não usa X-Forwarded-For (o cliente pode forjar a 1ª entrada).
+ * Sem `x-real-ip` do proxy, a chave cai em "unknown" e o limite fica global na instância.
+ */
 export function clientKeyFromHeaders(h: Headers) {
-  const forwarded = h.get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || h.get("x-real-ip")?.trim() || "unknown";
-  return ip;
+  const real = h.get("x-real-ip")?.trim() ?? "";
+  if (real && !real.includes(",") && !real.includes(" ")) return real;
+  return "unknown";
 }
 
 export const loginLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 10 });

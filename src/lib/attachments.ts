@@ -1,7 +1,7 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { canViewOwnSubmission } from "@/lib/access";
-import { headFileBlob } from "@/lib/blobs";
+import { headFileBlob, markBlobAttached } from "@/lib/blobs";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/dal";
 import { env } from "@/lib/env";
@@ -45,7 +45,7 @@ export async function attachUploadedFile(
   }
 
   // `fileKey` é único: o mesmo token não gera dois anexos.
-  return tx.attachment.create({
+  const attachment = await tx.attachment.create({
     data: {
       fileKey: claims.key,
       fileName: claims.fileName,
@@ -56,6 +56,8 @@ export async function attachUploadedFile(
       ...owner,
     },
   });
+  await markBlobAttached(claims.key, tx);
+  return attachment;
 }
 
 /** FINANCEIRO vê qualquer anexo; a chefia só os que ela mesma enviou; ADMIN nenhum. */

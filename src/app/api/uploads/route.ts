@@ -1,15 +1,15 @@
 import { z } from "zod";
-import { putFileBlob } from "@/lib/blobs";
+import { BlobQuotaError, putFileBlob } from "@/lib/blobs";
 import { authenticateRequest } from "@/lib/dal";
 import { env } from "@/lib/env";
-import { clientKeyFromHeaders, uploadLimiter } from "@/lib/rate-limit";
+import { uploadLimiter } from "@/lib/rate-limit";
 import {
   ATTACHMENT_CATEGORIES,
   buildFileKey,
   canUploadCategory,
   isAllowedMime,
 } from "@/lib/storage-keys";
-import { MAX_UPLOAD_BYTES, sanitizeOriginalName, sniffedMime } from "@/lib/upload-guard";
+import { MAX_UPLOAD_BYTES, sanitizeOriginalName, sniffedMime, stripUnsafeXml } from "@/lib/upload-guard";
 import { createUploadToken } from "@/lib/upload-token";
 
 const TOKEN_TTL_SECONDS = 60 * 60;
@@ -32,8 +32,7 @@ function mimeFromFile(file: File) {
 export async function POST(request: Request) {
   const { user, error } = await authenticateRequest();
   if (error) return error;
-  const limitKey = `upload:${user.id}:${clientKeyFromHeaders(request.headers)}`;
-  if (!uploadLimiter.take(limitKey)) {
+  if (!uploadLimiter.take(`upload:${user.id}`)) {
     return Response.json({ error: "Muitas tentativas de upload. Aguarde um minuto." }, { status: 429 });
   }
 
@@ -70,7 +69,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const data = Buffer.from(await file.arrayBuffer());
+  let data = Buffer.from(await file.arrayBuffer());
   if (data.length < 1 || data.length > maxBytes) {
     return Response.json(
       { error: data.length < 1 ? "Arquivo vazio." : `Arquivo acima de ${e.UPLOAD_MAX_SIZE_MB} MB.` },
@@ -81,6 +80,13 @@ export async function POST(request: Request) {
   if (!fileType || !isAllowedMime(category, fileType)) {
     return Response.json({ error: "Conteúdo do arquivo não confere com o tipo permitido." }, { status: 415 });
   }
+  if (fileType === "application/xml" || fileType === "text/xml") {
+    const stripped = stripUnsafeXml(data);
+    if (!stripped) {
+      return Response.json({ error: "XML recusado: conteúdo inseguro." }, { status: 415 });
+    }
+    data = stripped;
+  }
 
   const fileKey = buildFileKey({
     category,
@@ -88,7 +94,21 @@ export async function POST(request: Request) {
     referenceDate: referenceDate ? new Date(`${referenceDate}T12:00:00Z`) : undefined,
     timeZone: e.APP_TIMEZONE,
   });
-  await putFileBlob({ fileKey, data, fileType, fileSize: data.length, category });
+  try {
+    await putFileBlob({
+      fileKey,
+      data,
+      fileType,
+      fileSize: data.length,
+      category,
+      uploadedById: user.id,
+    });
+  } catch (err) {
+    if (err instanceof BlobQuotaError) {
+      return Response.json({ error: err.message }, { status: 413 });
+    }
+    throw err;
+  }
   const uploadToken = createUploadToken(
     {
       key: fileKey,

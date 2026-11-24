@@ -454,12 +454,17 @@ model Contract {
 // ───────────────────────────── Anexos ─────────────────────────────
 
 model FileBlob {
-  fileKey   String   @id // mesma key gerada em storage-keys (nunca o nome original)
-  data      Bytes
-  fileType  String
-  fileSize  Int
-  createdAt DateTime @default(now())
+  fileKey      String    @id // mesma key gerada em storage-keys (nunca o nome original)
+  data         Bytes
+  fileType     String
+  fileSize     Int
+  uploadedById String? // quem enviou; quota de pendentes por usuário
+  expiresAt    DateTime? // pendente até anexar a um registro; depois fica nulo
+  attachedAt   DateTime?
+  createdAt    DateTime  @default(now())
 
+  @@index([expiresAt])
+  @@index([uploadedById, attachedAt])
   @@map("file_blobs")
 }
 

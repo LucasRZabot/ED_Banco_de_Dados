@@ -20,7 +20,7 @@ Prisma 7 + PostgreSQL · Auth.js v5 (Credentials, sessão JWT) · anexos em Post
 | 7 | Contratos | ✅ |
 | 8 | Dashboard completo | ✅ |
 | 9 | Preparação para produção (health, headers, docs de deploy) | ✅ |
-| 10 | Hosting Cursor (Postgres da plataforma, sem AWS/Firebase) | ⏸ pausado até revisão de lacunas |
+| 10 | Hosting Cursor (Postgres da plataforma, sem AWS/Firebase) | ✅ |
 
 ## Perfis
 
@@ -39,23 +39,16 @@ Pré-requisitos: Node 22+, Docker.
 
 ```bash
 cp .env.example .env
-# gere segredos: AUTH_SECRET (npx auth secret) e CRON_SECRET (openssl rand -hex 24)
+# preencha AUTH_SECRET (npx auth secret), CRON_SECRET, BOOTSTRAP_SECRET e, se for usar seed, SEED_*
 
 docker compose up -d          # postgres:16
 npm install                   # também roda `prisma generate`
-npm run setup                 # migrations + seed
+npm run setup                 # migrations + seed (seed exige SEED_* no .env)
 npm run dev                   # http://localhost:3000
 ```
 
-Contas do seed (senha provisória, troca obrigatória no primeiro login):
-
-| Perfil | E-mail | Senha inicial |
-|---|---|---|
-| ADMIN (TI) | `admin@hospital.local` | `Admin@123456` |
-| Financeiro | `financeiro@hospital.local` | `Financeiro@123456` |
-| Chefia (UTI Adulto) | `chefia.uti@hospital.local` | `Chefia@123456` |
-
-E-mails e senhas vêm de `SEED_*` no `.env` (com esses padrões se a variável não existir). O seed não sobrescreve contas existentes.
+O seed local cria ADMIN, FINANCEIRO e uma chefia a partir de `SEED_*` no `.env`. Não há senha de
+exemplo neste repositório. O seed não sobrescreve contas existentes e **não roda em produção**.
 
 ## Scripts
 
@@ -77,8 +70,9 @@ curl -s http://localhost:3000/api/health
 ```
 
 Produção (Cursor publish-app, Postgres da plataforma): **[docs/deploy.md](docs/deploy.md)**.
-Visibilidade **team** ou **public**, nunca só private. Sem seed `@hospital.local` em produção:
-o primeiro acesso cria o ADMIN de TI; as demais contas saem de **Administração → Usuários**.
+Visibilidade **team** ou **public**, nunca só private. Sem seed em produção: o primeiro ADMIN só
+existe depois que a TI completa o setup com `BOOTSTRAP_SECRET`; as demais contas saem de
+**Administração → Usuários**.
 
 ## Estrutura
 
@@ -121,7 +115,7 @@ src/app/api/files/[id]       GET → checa permissão → bytes (sem URL públic
 
 Ver o guia completo em **[docs/deploy.md](docs/deploy.md)**. Resumo:
 
-- `cursor-app.json` pede Postgres; a plataforma define `DATABASE_URL`. Bind só `AUTH_SECRET` e `CRON_SECRET`.
+- `cursor-app.json` pede Postgres; a plataforma define `DATABASE_URL`. Bind `AUTH_SECRET`, `CRON_SECRET` e `BOOTSTRAP_SECRET`.
 - Anexos em bytea; sem S3/Firebase.
 - Cron → `POST /api/cron/check-deadlines` com `Authorization: Bearer $CRON_SECRET`.
 - Healthcheck: `GET /api/health`. Cabeçalhos de segurança no `next.config.ts`.

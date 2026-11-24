@@ -61,6 +61,9 @@ describe("filtros do dashboard", () => {
       "/boletos?status=OVERDUE&supplierId=s1",
     );
     expect(csvCell('UTI; "adulto"')).toBe('"UTI; ""adulto"""');
+    expect(csvCell("=1+1")).toBe("\"'=1+1\"");
+    expect(csvCell("+cmd")).toBe("\"'+cmd\"");
+    expect(csvCell("@SUM(A1)")).toBe("\"'@SUM(A1)\"");
     const csv = buildDashboardCsv([
       {
         tipo: "boleto",

@@ -1,6 +1,6 @@
 import { canViewAttachment } from "@/lib/attachments";
 import { getFileBlob } from "@/lib/blobs";
-import { contentDisposition } from "@/lib/content-disposition";
+import { fileDownloadHeaders } from "@/lib/content-disposition";
 import { authenticateRequest } from "@/lib/dal";
 import { isSafeFileKey } from "@/lib/upload-guard";
 
@@ -22,11 +22,10 @@ export async function GET(request: Request, ctx: RouteContext<"/api/files/[id]">
   const download = new URL(request.url).searchParams.get("download") === "1";
   return new Response(new Uint8Array(blob.data), {
     status: 200,
-    headers: {
-      "Content-Type": attachment.fileType,
-      "Content-Disposition": contentDisposition(attachment.fileName, download ? "attachment" : "inline"),
-      "Cache-Control": "private, no-store",
-      "X-Content-Type-Options": "nosniff",
-    },
+    headers: fileDownloadHeaders({
+      fileName: attachment.fileName,
+      fileType: attachment.fileType,
+      download,
+    }),
   });
 }

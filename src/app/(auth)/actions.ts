@@ -1,13 +1,13 @@
 "use server";
 
 import { AuthError } from "next-auth";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { signIn, signOut } from "@/auth";
+import { bootstrapSecretMatches, configuredBootstrapSecret } from "@/lib/bootstrap-secret";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/dal";
 import { hashPassword, passwordSchema, verifyPassword } from "@/lib/password";
-import { clientKeyFromHeaders, loginLimiter } from "@/lib/rate-limit";
+import { loginLimiter } from "@/lib/rate-limit";
 import { homePathFor } from "@/lib/roles";
 
 /**
@@ -39,20 +39,26 @@ const bootstrapSchema = z
     email: z.email("E-mail inválido.").transform((v) => v.trim().toLowerCase()),
     password: passwordSchema,
     confirmPassword: z.string(),
+    setupSecret: z.string().min(1, "Informe o código de setup da TI."),
   })
   .refine((d) => d.password === d.confirmPassword, {
     path: ["confirmPassword"],
     message: "As senhas não conferem.",
   });
 
-/** Só quando o banco não tem nenhum usuário: cria o primeiro ADMIN (TI) com e-mail real. */
+/** Só quando o banco não tem nenhum usuário: TI completa o setup com BOOTSTRAP_SECRET. */
 export async function bootstrapFirstAdmin(_prev: FormState, formData: FormData): Promise<FormState> {
-  const ip = clientKeyFromHeaders(await headers());
-  if (!loginLimiter.take(`bootstrap:${ip}`)) {
+  if (!loginLimiter.take("bootstrap")) {
     return { error: "Muitas tentativas. Aguarde alguns minutos." };
+  }
+  if (!configuredBootstrapSecret()) {
+    return { error: "Setup bloqueado. A TI precisa configurar BOOTSTRAP_SECRET no host." };
   }
   const parsed = bootstrapSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
+  if (!bootstrapSecretMatches(parsed.data.setupSecret)) {
+    return { error: "Código de setup inválido." };
+  }
 
   try {
     await db.$transaction(async (tx) => {
@@ -90,8 +96,10 @@ export async function bootstrapFirstAdmin(_prev: FormState, formData: FormData):
 }
 
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
-  const ip = clientKeyFromHeaders(await headers());
-  if (!loginLimiter.take(`login:${ip}`)) {
+  const email = String(formData.get("email") ?? "")
+    .trim()
+    .toLowerCase();
+  if (!loginLimiter.take(`login:${email || "empty"}`)) {
     return { error: "Muitas tentativas. Aguarde alguns minutos." };
   }
   try {

@@ -126,6 +126,7 @@ export async function resetUserPassword(id: string): Promise<UserFormState> {
     },
     select: { id: true, email: true },
   });
+  await db.session.deleteMany({ where: { userId: user.id } });
   // A sessão atual continua sendo a da TI. Não chama signIn da conta redefinida.
   log.info("admin.password_reset", { actorId: admin.id, targetId: user.id });
   revalidatePath("/admin/usuarios");

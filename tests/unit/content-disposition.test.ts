@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contentDisposition } from "@/lib/content-disposition";
+import { contentDisposition, fileDownloadHeaders } from "@/lib/content-disposition";
 
 describe("contentDisposition", () => {
   it("marca inline e preserva o nome em UTF-8", () => {
@@ -11,5 +11,12 @@ describe("contentDisposition", () => {
 
   it("marca attachment quando o download é forçado", () => {
     expect(contentDisposition("boleto.pdf", "attachment")).toMatch(/^attachment;/);
+  });
+
+  it("serve XML como anexo octet-stream, nunca inline/html", () => {
+    const headers = fileDownloadHeaders({ fileName: "nfe.xml", fileType: "text/xml" });
+    expect(headers["Content-Type"]).toBe("application/octet-stream");
+    expect(headers["Content-Disposition"]).toMatch(/^attachment;/);
+    expect(headers["X-Content-Type-Options"]).toBe("nosniff");
   });
 });

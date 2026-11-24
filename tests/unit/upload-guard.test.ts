@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSafeFileKey, sanitizeOriginalName, sniffedMime } from "@/lib/upload-guard";
+import { isSafeFileKey, sanitizeOriginalName, sniffedMime, stripUnsafeXml } from "@/lib/upload-guard";
 
 describe("sanitizeOriginalName", () => {
   it("descarta caminho e caracteres de travessia", () => {
@@ -17,9 +17,38 @@ describe("sniffedMime", () => {
     expect(sniffedMime(Buffer.from([0xff, 0xd8, 0xff, 0xe0]), "image/jpeg")).toBe("image/jpeg");
   });
 
-  it("recusa HTML ou executável disfarçado", () => {
+  it("recusa HTML, XHTML, SVG ou executável disfarçado", () => {
     expect(sniffedMime(Buffer.from("<html><script>"), "text/xml")).toBeNull();
+    expect(sniffedMime(Buffer.from("<nfe/>"), "text/xml")).toBeNull();
+    expect(
+      sniffedMime(
+        Buffer.from('<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><script>alert(1)</script></html>'),
+        "text/xml",
+      ),
+    ).toBeNull();
+    expect(sniffedMime(Buffer.from('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"></svg>'), "text/xml")).toBeNull();
     expect(sniffedMime(Buffer.from("MZ"), "application/pdf")).toBeNull();
+  });
+});
+
+describe("stripUnsafeXml", () => {
+  it("remove script e javascript: de NF-e", () => {
+    const raw = Buffer.from(
+      '<?xml version="1.0"?><nfeProc><infNFe onclick="javascript:alert(1)"/><script>x</script></nfeProc>',
+    );
+    const out = stripUnsafeXml(raw);
+    expect(out).toBeTruthy();
+    const text = out!.toString("utf8").toLowerCase();
+    expect(text).toContain("<?xml");
+    expect(text).not.toContain("<script");
+    expect(text).not.toContain("javascript:");
+    expect(text).not.toContain("onclick");
+  });
+
+  it("recusa XHTML mesmo com declaração XML", () => {
+    expect(
+      stripUnsafeXml(Buffer.from('<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><b>x</b></html>')),
+    ).toBeNull();
   });
 });
 

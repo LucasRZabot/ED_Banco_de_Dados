@@ -40,6 +40,17 @@ export function BootstrapAdminForm() {
         <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required />
         <FieldError messages={state?.fieldErrors?.confirmPassword} />
       </div>
+      <div className="grid gap-2">
+        <Label htmlFor="setupSecret">Código de setup (TI)</Label>
+        <Input
+          id="setupSecret"
+          name="setupSecret"
+          type="password"
+          autoComplete="off"
+          required
+        />
+        <FieldError messages={state?.fieldErrors?.setupSecret} />
+      </div>
       <Button type="submit" disabled={pending || !!state?.redirectTo} className="w-full">
         {pending || state?.redirectTo ? "Criando…" : "Criar administrador de TI"}
       </Button>
