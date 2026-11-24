@@ -14,12 +14,13 @@ describe("health e cron em produção", () => {
     expect(body.checks.s3).toBeUndefined();
   });
 
-  it("GET /api/health?deep=1 inclui o S3", async () => {
+  it("GET /api/health?deep=1 inclui o armazenamento em Postgres", async () => {
     const res = await healthGet(new Request("http://localhost/api/health?deep=1"));
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
-    expect(body.checks.s3).toBe("ok");
+    expect(body.checks.storage).toBe("ok");
+    expect(body.checks.s3).toBeUndefined();
   });
 
   it("cron recusa Bearer errado e aceita o CRON_SECRET", async () => {

@@ -1,8 +1,8 @@
 import { z } from "zod";
+import { putFileBlob } from "@/lib/blobs";
 import { authenticateRequest } from "@/lib/dal";
 import { env } from "@/lib/env";
-import { clientKeyFromHeaders, presignLimiter } from "@/lib/rate-limit";
-import { presignUpload } from "@/lib/s3";
+import { clientKeyFromHeaders, uploadLimiter } from "@/lib/rate-limit";
 import {
   ATTACHMENT_CATEGORIES,
   buildFileKey,
@@ -11,30 +11,49 @@ import {
 } from "@/lib/storage-keys";
 import { createUploadToken } from "@/lib/upload-token";
 
-// Tempo para o usuário terminar o formulário depois do upload; a URL de PUT expira antes.
 const TOKEN_TTL_SECONDS = 60 * 60;
 
-const bodySchema = z.object({
+const metaSchema = z.object({
   category: z.enum(ATTACHMENT_CATEGORIES),
-  fileName: z.string().trim().min(1).max(200),
-  fileType: z.string().min(1).max(100),
-  fileSize: z.number().int().positive(),
   referenceDate: z.iso.date().optional(),
 });
+
+function mimeFromFile(file: File) {
+  if (file.type) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".xml")) return "application/xml";
+  return file.type;
+}
 
 export async function POST(request: Request) {
   const { user, error } = await authenticateRequest();
   if (error) return error;
-  const limitKey = `presign:${user.id}:${clientKeyFromHeaders(request.headers)}`;
-  if (!presignLimiter.take(limitKey)) {
+  const limitKey = `upload:${user.id}:${clientKeyFromHeaders(request.headers)}`;
+  if (!uploadLimiter.take(limitKey)) {
     return Response.json({ error: "Muitas tentativas de upload. Aguarde um minuto." }, { status: 429 });
   }
 
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+  const form = await request.formData().catch(() => null);
+  const file = form?.get("file");
+  if (!form || !(file instanceof File)) {
+    return Response.json({ error: "Dados do arquivo inválidos." }, { status: 400 });
+  }
+
+  const parsed = metaSchema.safeParse({
+    category: form.get("category"),
+    referenceDate: form.get("referenceDate") || undefined,
+  });
   if (!parsed.success) {
     return Response.json({ error: "Dados do arquivo inválidos." }, { status: 400 });
   }
-  const { category, fileName, fileType, fileSize, referenceDate } = parsed.data;
+
+  const { category, referenceDate } = parsed.data;
+  const fileName = file.name.trim().slice(0, 200) || "arquivo";
+  const fileType = mimeFromFile(file);
+  const fileSize = file.size;
   const e = env();
 
   if (!canUploadCategory(user.role, category)) {
@@ -53,7 +72,8 @@ export async function POST(request: Request) {
     referenceDate: referenceDate ? new Date(`${referenceDate}T12:00:00Z`) : undefined,
     timeZone: e.APP_TIMEZONE,
   });
-  const uploadUrl = await presignUpload(fileKey, fileType);
+  const data = Buffer.from(await file.arrayBuffer());
+  await putFileBlob({ fileKey, data, fileType, fileSize });
   const uploadToken = createUploadToken(
     {
       key: fileKey,
@@ -67,11 +87,5 @@ export async function POST(request: Request) {
     e.AUTH_SECRET,
   );
 
-  return Response.json({
-    uploadUrl,
-    method: "PUT",
-    headers: { "Content-Type": fileType },
-    fileKey,
-    uploadToken,
-  });
+  return Response.json({ fileKey, uploadToken });
 }

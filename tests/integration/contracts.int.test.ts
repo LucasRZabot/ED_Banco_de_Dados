@@ -4,14 +4,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getContractOrNotFound, listContracts } from "@/features/contracts/queries";
 import { completeLinkedTicket } from "@/features/tickets/complete";
 import { attachUploadedFile } from "@/lib/attachments";
+import { getFileBlob } from "@/lib/blobs";
 import type { CurrentUser } from "@/lib/dal";
 import { addDays, todayInTz } from "@/lib/dates";
 import { db } from "@/lib/db";
-import { env } from "@/lib/env";
-import { presignDownload, presignUpload } from "@/lib/s3";
-import { buildFileKey } from "@/lib/storage-keys";
-import { createUploadToken } from "@/lib/upload-token";
 import { cnpjFromBase } from "@/lib/validators/cnpj";
+import { uploadBlob } from "./put-blob";
 
 const run = randomUUID().slice(0, 8);
 const pdf = Buffer.from(`%PDF-1.4\n% contrato ${run}\n%%EOF\n`);
@@ -39,23 +37,7 @@ async function makeUser(role: "ADMIN" | "FINANCEIRO" | "REQUESTER", sectorId: st
 }
 
 async function uploadContractPdf(userId: string) {
-  const key = buildFileKey({ category: "CONTRACT", mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
-  const url = await presignUpload(key, "application/pdf");
-  const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: pdf });
-  expect(put.ok).toBe(true);
-  const token = createUploadToken(
-    {
-      key,
-      userId,
-      category: "CONTRACT",
-      fileName: "contrato-assinado.pdf",
-      fileType: "application/pdf",
-      fileSize: pdf.length,
-      exp: Math.floor(Date.now() / 1000) + 600,
-    },
-    env().AUTH_SECRET,
-  );
-  return { key, token };
+  return uploadBlob({ userId, category: "CONTRACT", data: pdf, fileName: "contrato-assinado.pdf" });
 }
 
 beforeAll(async () => {
@@ -122,17 +104,15 @@ describe("visibilidade de contratos", () => {
 });
 
 describe("anexo PDF no prefixo contratos/", () => {
-  it("grava a key e o financeiro abre com presigned GET inline", async () => {
+  it("grava a key e o blob privado no Postgres", async () => {
     const { key, token } = await uploadContractPdf(financeiro.id);
     const att = await attachUploadedFile(token, financeiro, { contractId }, ["CONTRACT"]);
     expect(att.fileKey).toBe(key);
     expect(key).toMatch(/^contratos\/[0-9a-f-]{36}\.pdf$/);
 
-    const inlineUrl = await presignDownload(att.fileKey, att.fileName, att.fileType);
-    expect(decodeURIComponent(inlineUrl)).toMatch(/response-content-disposition=inline;/);
-    const res = await fetch(inlineUrl);
-    expect(res.ok).toBe(true);
-    expect(Buffer.from(await res.arrayBuffer()).equals(pdf)).toBe(true);
+    const blob = await getFileBlob(att.fileKey);
+    expect(blob).toBeTruthy();
+    expect(Buffer.from(blob!.data).equals(pdf)).toBe(true);
   });
 });
 

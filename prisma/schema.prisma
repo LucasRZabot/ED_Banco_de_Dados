@@ -452,11 +452,21 @@ model Contract {
 
 // ───────────────────────────── Anexos ─────────────────────────────
 
+model FileBlob {
+  fileKey   String   @id // mesma key gerada em storage-keys (nunca o nome original)
+  data      Bytes
+  fileType  String
+  fileSize  Int
+  createdAt DateTime @default(now())
+
+  @@map("file_blobs")
+}
+
 model Attachment {
   id           String             @id @default(cuid())
   fileKey      String             @unique // ex.: notas-fiscais/2026/11/<uuid>.pdf
   fileName     String // nome original (exibição/download)
-  fileType     String // MIME validado no presign
+  fileType     String // MIME validado no upload autenticado
   fileSize     Int // bytes
   category     AttachmentCategory
   uploadedById String

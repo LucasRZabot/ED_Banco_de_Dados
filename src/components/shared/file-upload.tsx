@@ -20,7 +20,7 @@ export function FileUpload({
   category: AttachmentCategoryKey;
   accept?: string;
   multiple?: boolean;
-  /** YYYY-MM-DD: mês do vencimento/emissão na key do S3. */
+  /** YYYY-MM-DD: mês do vencimento/emissão na key do anexo. */
   referenceDate?: string;
   onBusyChange?: (busy: boolean) => void;
   onPicked?: (file: File) => void | Promise<void>;

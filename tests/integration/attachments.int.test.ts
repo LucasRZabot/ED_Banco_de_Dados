@@ -2,17 +2,19 @@ import "dotenv/config";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AttachmentError, attachUploadedFile, canViewAttachment } from "@/lib/attachments";
+import { getFileBlob } from "@/lib/blobs";
+import { contentDisposition } from "@/lib/content-disposition";
 import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { todayInTz } from "@/lib/dates";
-import { presignDownload, presignUpload } from "@/lib/s3";
 import { buildFileKey } from "@/lib/storage-keys";
 import { createUploadToken } from "@/lib/upload-token";
 import { cnpjFromBase } from "@/lib/validators/cnpj";
 import { buildBankDigitableLine } from "@/lib/validators/digitable-line";
+import { uploadBlob } from "./put-blob";
 
-// Requer Postgres + S3 locais (docker compose up) e `npm run s3:setup`.
+// Requer Postgres local (docker compose up).
 const run = randomUUID().slice(0, 8);
 const pdf = Buffer.from(`%PDF-1.4\n% teste ${run}\n%%EOF\n`);
 
@@ -39,23 +41,7 @@ async function uploadPdf(
   fileName = "orçamento fornecedor.pdf",
   size = pdf.length,
 ) {
-  const key = buildFileKey({ category, mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
-  const url = await presignUpload(key, "application/pdf");
-  const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: pdf });
-  expect(put.ok).toBe(true);
-  const token = createUploadToken(
-    {
-      key,
-      userId,
-      category,
-      fileName,
-      fileType: "application/pdf",
-      fileSize: size,
-      exp: Math.floor(Date.now() / 1000) + 600,
-    },
-    env().AUTH_SECRET,
-  );
-  return { key, token };
+  return uploadBlob({ userId, category, data: pdf, fileName, size });
 }
 
 async function uploadTicketPdf(userId: string, size = pdf.length) {
@@ -113,7 +99,7 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-describe("anexos com S3 presigned", () => {
+describe("anexos em Postgres (bytea)", () => {
   it("grava o anexo, libera só para o autor e para o financeiro, e baixa o arquivo", async () => {
     const { key, token } = await uploadTicketPdf(chefiaA.id);
     const att = await attachUploadedFile(token, chefiaA, { ticketId }, ["TICKET"]);
@@ -126,11 +112,11 @@ describe("anexos com S3 presigned", () => {
     expect((await canViewAttachment(chefiaB, att.id)).allowed).toBe(false);
     expect((await canViewAttachment(admin, att.id)).allowed).toBe(false);
 
-    const res = await fetch(await presignDownload(att.fileKey, att.fileName, att.fileType));
-    expect(res.ok).toBe(true);
-    expect(Buffer.from(await res.arrayBuffer()).equals(pdf)).toBe(true);
-    expect(res.headers.get("content-disposition")).toMatch(/^inline;/);
-    expect(res.headers.get("content-disposition")).toContain("filename*=UTF-8''or%C3%A7amento");
+    const blob = await getFileBlob(att.fileKey);
+    expect(blob).toBeTruthy();
+    expect(Buffer.from(blob!.data).equals(pdf)).toBe(true);
+    expect(contentDisposition(att.fileName, "inline")).toMatch(/^inline;/);
+    expect(contentDisposition(att.fileName, "inline")).toContain("filename*=UTF-8''or%C3%A7amento");
 
     await expect(attachUploadedFile(token, chefiaA, { ticketId })).rejects.toThrow(); // fileKey único
   });
@@ -148,7 +134,7 @@ describe("anexos com S3 presigned", () => {
     await expect(attachUploadedFile(lying.token, chefiaA, { ticketId })).rejects.toThrow(/Tamanho/);
   });
 
-  it("recusa key que não foi enviada ao S3", async () => {
+  it("recusa key que não foi gravada no banco", async () => {
     const key = buildFileKey({ category: "TICKET", mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
     const token = createUploadToken(
       {
@@ -239,7 +225,7 @@ describe("anexos com S3 presigned", () => {
     await expect(db.invoice.update({ where: { id: pending.id }, data: { status: "POSTED" } })).rejects.toThrow();
   });
 
-  it("anexa o PDF do boleto e o presigned GET abre inline (download só com ?download=1)", async () => {
+  it("anexa o PDF do boleto; o blob fica privado e o header distingue inline de download", async () => {
     const { key, token } = await uploadPdf(financeiro.id, "BILL", "boleto-itau.pdf");
     const att = await attachUploadedFile(token, financeiro, { billId }, ["BILL"]);
     expect(att).toMatchObject({ fileKey: key, category: "BILL", billId, fileName: "boleto-itau.pdf" });
@@ -249,21 +235,11 @@ describe("anexos com S3 presigned", () => {
     expect((await canViewAttachment(chefiaA, att.id)).allowed).toBe(false);
     expect((await canViewAttachment(admin, att.id)).allowed).toBe(false);
 
-    const inlineUrl = await presignDownload(att.fileKey, att.fileName, att.fileType);
-    const forceDownloadUrl = await presignDownload(att.fileKey, att.fileName, att.fileType, {
-      disposition: "attachment",
-    });
-    expect(decodeURIComponent(inlineUrl)).toMatch(/response-content-disposition=inline;/);
-    expect(decodeURIComponent(forceDownloadUrl)).toMatch(/response-content-disposition=attachment;/);
-
-    const inline = await fetch(inlineUrl);
-    expect(inline.ok).toBe(true);
-    expect(inline.headers.get("content-disposition")).toMatch(/^inline;/);
-    expect(inline.headers.get("content-type")).toMatch(/pdf/);
-    expect(Buffer.from(await inline.arrayBuffer()).equals(pdf)).toBe(true);
-
-    const downloaded = await fetch(forceDownloadUrl);
-    expect(downloaded.headers.get("content-disposition")).toMatch(/^attachment;/);
+    const blob = await getFileBlob(att.fileKey);
+    expect(blob).toBeTruthy();
+    expect(Buffer.from(blob!.data).equals(pdf)).toBe(true);
+    expect(contentDisposition(att.fileName, "inline")).toMatch(/^inline;/);
+    expect(contentDisposition(att.fileName, "attachment")).toMatch(/^attachment;/);
   });
 
   it("banco recusa chefia sem setor (CHECK)", async () => {

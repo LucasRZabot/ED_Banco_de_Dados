@@ -33,6 +33,62 @@ function safeRedirectPath(raw: FormDataEntryValue | null) {
 
 const INVALID_LOGIN = "E-mail ou senha inválidos, ou conta desativada.";
 
+const bootstrapSchema = z
+  .object({
+    name: z.string().trim().min(3, "Informe o nome completo.").max(120),
+    email: z.email("E-mail inválido.").transform((v) => v.trim().toLowerCase()),
+    password: passwordSchema,
+    confirmPassword: z.string(),
+  })
+  .refine((d) => d.password === d.confirmPassword, {
+    path: ["confirmPassword"],
+    message: "As senhas não conferem.",
+  });
+
+/** Só quando o banco não tem nenhum usuário: cria o primeiro ADMIN (TI) com e-mail real. */
+export async function bootstrapFirstAdmin(_prev: FormState, formData: FormData): Promise<FormState> {
+  const ip = clientKeyFromHeaders(await headers());
+  if (!loginLimiter.take(`bootstrap:${ip}`)) {
+    return { error: "Muitas tentativas. Aguarde alguns minutos." };
+  }
+  const parsed = bootstrapSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { fieldErrors: z.flattenError(parsed.error).fieldErrors };
+
+  try {
+    await db.$transaction(async (tx) => {
+      if ((await tx.user.count()) > 0) {
+        throw new Error("ALREADY_BOOTSTRAPPED");
+      }
+      await tx.user.create({
+        data: {
+          name: parsed.data.name,
+          email: parsed.data.email,
+          role: "ADMIN",
+          passwordHash: await hashPassword(parsed.data.password),
+          mustChangePassword: false,
+        },
+      });
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "ALREADY_BOOTSTRAPPED") {
+      return { error: "Já existe usuário. Entre com a conta da TI." };
+    }
+    throw err;
+  }
+
+  try {
+    await signIn("credentials", {
+      email: parsed.data.email,
+      password: parsed.data.password,
+      redirect: false,
+    });
+  } catch (err) {
+    if (err instanceof AuthError) return { redirectTo: "/login" };
+    throw err;
+  }
+  return { redirectTo: homePathFor("ADMIN") };
+}
+
 export async function login(_prev: FormState, formData: FormData): Promise<FormState> {
   const ip = clientKeyFromHeaders(await headers());
   if (!loginLimiter.take(`login:${ip}`)) {

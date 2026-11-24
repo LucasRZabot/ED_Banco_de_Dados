@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import type { AttachmentCategoryKey } from "@/lib/storage-keys";
 
 /**
- * Token emitido junto com a presigned URL. Prova que a key foi gerada pelo servidor
+ * Token emitido no upload autenticado. Prova que a key foi gerada pelo servidor
  * para aquele usuário, categoria e arquivo; a server action que grava o anexo o exige.
  */
 export type UploadClaims = {

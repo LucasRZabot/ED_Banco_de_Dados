@@ -65,7 +65,7 @@ function yearMonth(date: Date, timeZone: string) {
 }
 
 /**
- * Gera a key do objeto. O nome original nunca entra na key (fica só no banco),
+ * Gera a key do blob. O nome original nunca entra na key (fica só no banco),
  * evitando caracteres problemáticos e vazamento de informação pelo caminho.
  * `referenceDate` define YYYY/MM nos prefixos datados (emissão da NF, vencimento do boleto).
  */

@@ -17,12 +17,5 @@ services:
       timeout: 5s
       retries: 10
 
-  # S3 local para desenvolvimento (moto). O bucket e o CORS são criados por `npm run s3:setup`.
-  s3:
-    image: motoserver/moto:5.2.5
-    restart: unless-stopped
-    ports:
-      - "4566:5000"
-
 volumes:
   pgdata:

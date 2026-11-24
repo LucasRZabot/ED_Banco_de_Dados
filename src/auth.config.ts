@@ -1,3 +1,4 @@
+import "@/lib/auth-host";
 import type { NextAuthConfig } from "next-auth";
 import { canAccessPath, homePathFor, type AppRole } from "@/lib/roles";
 

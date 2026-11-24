@@ -8,39 +8,31 @@ export type UploadedFile = {
   fileSize: number;
 };
 
-/** Usado pelo navegador: pede a presigned URL e envia o arquivo direto ao S3. */
+function mimeFromName(file: File) {
+  if (file.type) return file.type;
+  const name = file.name.toLowerCase();
+  if (name.endsWith(".pdf")) return "application/pdf";
+  if (name.endsWith(".png")) return "image/png";
+  if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
+  if (name.endsWith(".xml")) return "application/xml";
+  return file.type;
+}
+
+/** Usado pelo navegador: envia o arquivo ao servidor autenticado (grava bytea no Postgres). */
 export async function uploadFile(
   file: File,
   category: AttachmentCategoryKey,
   referenceDate?: string,
 ): Promise<UploadedFile> {
-  const fileType =
-    file.type ||
-    (file.name.toLowerCase().endsWith(".pdf")
-      ? "application/pdf"
-      : file.name.toLowerCase().endsWith(".png")
-        ? "image/png"
-        : file.name.toLowerCase().endsWith(".jpg") || file.name.toLowerCase().endsWith(".jpeg")
-          ? "image/jpeg"
-          : file.name.toLowerCase().endsWith(".xml")
-            ? "application/xml"
-            : file.type);
-  const res = await fetch("/api/uploads/presign", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      category,
-      fileName: file.name,
-      fileType,
-      fileSize: file.size,
-      referenceDate,
-    }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "Não foi possível preparar o upload.");
+  const fileType = mimeFromName(file);
+  const form = new FormData();
+  form.set("file", file);
+  form.set("category", category);
+  if (referenceDate) form.set("referenceDate", referenceDate);
 
-  const put = await fetch(data.uploadUrl, { method: "PUT", headers: data.headers, body: file });
-  if (!put.ok) throw new Error("Falha ao enviar o arquivo ao armazenamento.");
+  const res = await fetch("/api/uploads", { method: "POST", body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? "Não foi possível enviar o arquivo.");
 
   return {
     uploadToken: data.uploadToken,

@@ -27,4 +27,4 @@ export function clientKeyFromHeaders(h: Headers) {
 }
 
 export const loginLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 10 });
-export const presignLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
+export const uploadLimiter = createRateLimiter({ windowMs: 60 * 1000, max: 30 });
