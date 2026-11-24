@@ -1,6 +1,6 @@
 import { canViewAttachment } from "@/lib/attachments";
 import { authenticateRequest } from "@/lib/dal";
-import { presignDownload } from "@/lib/s3";
+import { presignDownload } from "@/lib/storage";
 
 export async function GET(request: Request, ctx: RouteContext<"/api/files/[id]">) {
   const { user, error } = await authenticateRequest();

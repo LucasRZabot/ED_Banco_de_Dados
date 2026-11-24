@@ -10,7 +10,7 @@ import { requireFinance, requireRole } from "@/lib/dal";
 import { parseDateOnly } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { parseNfeXml } from "@/lib/nfe-xml";
-import { getObjectText } from "@/lib/s3";
+import { getObjectText } from "@/lib/storage";
 import { verifyUploadToken } from "@/lib/upload-token";
 import { env } from "@/lib/env";
 import { completeLinkedTicket } from "@/features/tickets/complete";

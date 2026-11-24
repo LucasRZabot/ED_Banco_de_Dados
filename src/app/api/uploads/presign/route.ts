@@ -2,7 +2,7 @@ import { z } from "zod";
 import { authenticateRequest } from "@/lib/dal";
 import { env } from "@/lib/env";
 import { clientKeyFromHeaders, presignLimiter } from "@/lib/rate-limit";
-import { presignUpload } from "@/lib/s3";
+import { presignUpload } from "@/lib/storage";
 import {
   ATTACHMENT_CATEGORIES,
   buildFileKey,

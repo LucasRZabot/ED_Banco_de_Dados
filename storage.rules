@@ -1,0 +1,10 @@
+rules_version = '2';
+// Bucket 100% privado. Upload/download passam por URLs assinadas no servidor
+// (RBAC + uploadToken). O SDK do cliente no navegador não lê nem grava.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

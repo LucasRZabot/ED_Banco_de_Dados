@@ -8,7 +8,7 @@ export type UploadedFile = {
   fileSize: number;
 };
 
-/** Usado pelo navegador: pede a presigned URL e envia o arquivo direto ao S3. */
+/** Usado pelo navegador: pede a URL assinada e envia o arquivo direto ao armazenamento. */
 export async function uploadFile(
   file: File,
   category: AttachmentCategoryKey,

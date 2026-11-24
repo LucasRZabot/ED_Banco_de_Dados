@@ -6,13 +6,13 @@ import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { todayInTz } from "@/lib/dates";
-import { presignDownload, presignUpload } from "@/lib/s3";
+import { presignDownload, presignUpload } from "@/lib/storage";
 import { buildFileKey } from "@/lib/storage-keys";
 import { createUploadToken } from "@/lib/upload-token";
 import { cnpjFromBase } from "@/lib/validators/cnpj";
 import { buildBankDigitableLine } from "@/lib/validators/digitable-line";
 
-// Requer Postgres + S3 locais (docker compose up) e `npm run s3:setup`.
+// Requer Postgres + armazenamento local (docker compose up) e `npm run s3:setup`.
 const run = randomUUID().slice(0, 8);
 const pdf = Buffer.from(`%PDF-1.4\n% teste ${run}\n%%EOF\n`);
 

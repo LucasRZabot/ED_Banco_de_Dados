@@ -1,4 +1,4 @@
-# Imagem de produção (não provisiona AWS). Build: docker build -t financeiro .
+# Imagem opcional. Produção prevista: Firebase App Hosting (não AWS). Build: docker build -t financeiro .
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./

@@ -1,6 +1,6 @@
 /**
- * Cria o bucket privado e aplica CORS/bloqueio de acesso público.
- * Em dev roda contra o S3 local (moto); em prod o bucket deve vir do IaC — use só para conferir.
+ * Cria o bucket privado e aplica CORS/bloqueio de acesso público no moto local.
+ * Produção usa Firebase Storage (`npm run storage:setup:gcs`), não este script.
  */
 import "dotenv/config";
 import {

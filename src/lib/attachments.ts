@@ -4,7 +4,7 @@ import { canViewOwnSubmission } from "@/lib/access";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/dal";
 import { env } from "@/lib/env";
-import { headObject } from "@/lib/s3";
+import { headObject } from "@/lib/storage";
 import { keyMatchesCategory, type AttachmentCategoryKey } from "@/lib/storage-keys";
 import { verifyUploadToken } from "@/lib/upload-token";
 
@@ -19,7 +19,7 @@ export type AttachmentOwner =
 export class AttachmentError extends Error {}
 
 /**
- * Converte um upload já enviado ao S3 em registro `Attachment`.
+ * Converte um upload já enviado ao armazenamento (Firebase Storage / S3 local) em registro `Attachment`.
  * Chamada pelas server actions dos módulos (chamados, NFs, boletos...) ao salvar a entidade dona.
  */
 export async function attachUploadedFile(

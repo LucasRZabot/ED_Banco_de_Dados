@@ -6,7 +6,7 @@ import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getInvoiceOrNotFound, listInvoices } from "@/features/invoices/queries";
-import { presignDownload, presignUpload } from "@/lib/s3";
+import { presignDownload, presignUpload } from "@/lib/storage";
 import { buildFileKey } from "@/lib/storage-keys";
 import { createUploadToken } from "@/lib/upload-token";
 import { cnpjFromBase } from "@/lib/validators/cnpj";

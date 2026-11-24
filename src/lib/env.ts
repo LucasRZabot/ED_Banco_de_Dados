@@ -1,15 +1,23 @@
 import "server-only";
 import { z } from "zod";
+import { resolveStorageProvider, storageBucketFromFirebaseConfig } from "@/lib/storage-provider";
 
 const emptyToUndefined = (v: unknown) => (v === "" ? undefined : v);
 
-const schema = z.object({
+const common = {
   DATABASE_URL: z.string().min(1),
   AUTH_SECRET: z.string().min(32, "AUTH_SECRET precisa ter pelo menos 32 caracteres"),
   AUTH_SESSION_MAX_AGE_HOURS: z.coerce.number().int().positive().default(10),
   APP_TIMEZONE: z.string().default("America/Sao_Paulo"),
   ALERT_WARNING_DAYS: z.coerce.number().int().min(1).max(30).default(5),
   CRON_SECRET: z.string().min(16, "CRON_SECRET precisa ter pelo menos 16 caracteres"),
+  STORAGE_PRESIGN_EXPIRES_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
+  UPLOAD_MAX_SIZE_MB: z.coerce.number().positive().default(15),
+};
+
+const s3Schema = z.object({
+  ...common,
+  STORAGE_PROVIDER: z.literal("s3"),
   AWS_REGION: z.string().min(1),
   S3_BUCKET: z.string().min(1),
   AWS_ACCESS_KEY_ID: z.preprocess(emptyToUndefined, z.string().optional()),
@@ -19,23 +27,53 @@ const schema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
-  S3_PRESIGN_EXPIRES_SECONDS: z.coerce.number().int().min(30).max(3600).default(300),
-  UPLOAD_MAX_SIZE_MB: z.coerce.number().positive().default(15),
 });
 
-export type Env = z.infer<typeof schema>;
+const gcsSchema = z.object({
+  ...common,
+  STORAGE_PROVIDER: z.literal("gcs"),
+  GCS_BUCKET: z.string().min(1),
+});
+
+export type Env = z.infer<typeof s3Schema> | z.infer<typeof gcsSchema>;
 
 let cached: Env | undefined;
 
+function parseEnv(): Env {
+  const provider = resolveStorageProvider(process.env);
+  const input = {
+    ...process.env,
+    STORAGE_PROVIDER: provider,
+    STORAGE_PRESIGN_EXPIRES_SECONDS:
+      process.env.STORAGE_PRESIGN_EXPIRES_SECONDS || process.env.S3_PRESIGN_EXPIRES_SECONDS,
+    GCS_BUCKET: process.env.GCS_BUCKET?.trim() || storageBucketFromFirebaseConfig(process.env.FIREBASE_CONFIG),
+  };
+  const parsed = (provider === "gcs" ? gcsSchema : s3Schema).safeParse(input);
+  if (!parsed.success) {
+    const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
+    throw new Error(`Variáveis de ambiente inválidas:\n${issues.join("\n")}`);
+  }
+  return parsed.data;
+}
+
 // Validação preguiçosa: `next build` importa os módulos sem precisar das variáveis.
 export function env(): Env {
-  if (!cached) {
-    const parsed = schema.safeParse(process.env);
-    if (!parsed.success) {
-      const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`);
-      throw new Error(`Variáveis de ambiente inválidas:\n${issues.join("\n")}`);
-    }
-    cached = parsed.data;
-  }
+  if (!cached) cached = parseEnv();
   return cached;
+}
+
+export function envS3(): Extract<Env, { STORAGE_PROVIDER: "s3" }> {
+  const e = env();
+  if (e.STORAGE_PROVIDER !== "s3") {
+    throw new Error("Armazenamento local (S3/moto) chamado com STORAGE_PROVIDER diferente de s3.");
+  }
+  return e;
+}
+
+export function envGcs(): Extract<Env, { STORAGE_PROVIDER: "gcs" }> {
+  const e = env();
+  if (e.STORAGE_PROVIDER !== "gcs") {
+    throw new Error("Firebase Storage chamado com STORAGE_PROVIDER diferente de gcs.");
+  }
+  return e;
 }

@@ -4,18 +4,19 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.mts",
+    "build": "node scripts/prisma-migrate-on-deploy.mjs && next build",
     "postinstall": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "s3:setup": "tsx scripts/setup-s3.ts",
+    "storage:setup:gcs": "tsx scripts/setup-gcs.ts",
     "setup": "npm run db:deploy && npm run db:seed && npm run s3:setup"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "@aws-sdk/client-s3": "^3.1172.0",
     "@aws-sdk/s3-request-presigner": "^3.1172.0",
     "@base-ui/react": "^1.9.0",
+    "@google-cloud/storage": "^9.0.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "bcryptjs": "^3.0.3",

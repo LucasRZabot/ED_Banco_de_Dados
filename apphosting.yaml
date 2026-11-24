@@ -1,0 +1,46 @@
+# Firebase App Hosting (Next.js App Router → Cloud Run + Cloud CDN).
+# Não sobrescreva `scripts.buildCommand`: isso desliga o adapter oficial do Next.js.
+# GCS_BUCKET pode ficar de fora: em runtime o App Hosting injeta FIREBASE_CONFIG.storageBucket.
+
+runConfig:
+  minInstances: 0
+  maxInstances: 4
+  concurrency: 80
+  cpu: 1
+  memoryMiB: 1024
+
+env:
+  - variable: STORAGE_PROVIDER
+    value: gcs
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: APP_TIMEZONE
+    value: America/Sao_Paulo
+  - variable: ALERT_WARNING_DAYS
+    value: "5"
+  - variable: AUTH_TRUST_HOST
+    value: "true"
+  - variable: AUTH_SESSION_MAX_AGE_HOURS
+    value: "10"
+  - variable: STORAGE_PRESIGN_EXPIRES_SECONDS
+    value: "300"
+  - variable: UPLOAD_MAX_SIZE_MB
+    value: "15"
+  - variable: RUN_DB_MIGRATE
+    value: "1"
+    availability:
+      - BUILD
+  - variable: DATABASE_URL
+    secret: DATABASE_URL
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: AUTH_SECRET
+    secret: AUTH_SECRET
+    availability:
+      - RUNTIME
+  - variable: CRON_SECRET
+    secret: CRON_SECRET
+    availability:
+      - RUNTIME

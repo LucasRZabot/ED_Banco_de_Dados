@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   poweredByHeader: false,
   output: "standalone",
+  serverExternalPackages: ["@google-cloud/storage", "pg"],
   async headers() {
     return [
       {

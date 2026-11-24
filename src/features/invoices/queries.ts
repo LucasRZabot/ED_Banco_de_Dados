@@ -5,7 +5,7 @@ import { canViewInvoice } from "@/lib/access";
 import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { parseNfeXml } from "@/lib/nfe-xml";
-import { getObjectText } from "@/lib/s3";
+import { getObjectText } from "@/lib/storage";
 import type { InvoiceFilters } from "./schemas";
 
 function visibilityWhere(user: CurrentUser): Prisma.InvoiceWhereInput {
