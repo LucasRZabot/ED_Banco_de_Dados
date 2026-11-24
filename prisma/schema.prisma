@@ -107,6 +107,7 @@ model User {
   role          Role      @default(REQUESTER)
   active        Boolean   @default(true)
   mustChangePassword Boolean @default(true) // senha provisória definida pelo ADMIN
+  sessionVersion Int      @default(0) // incrementa no reset de senha; invalida JWT antigo
   sectorId      String? // obrigatório para REQUESTER (chefia do setor) — CHECK na migration
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())

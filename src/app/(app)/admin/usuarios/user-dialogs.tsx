@@ -55,7 +55,10 @@ function TemporaryPassword({ email, password }: { email: string; password: strin
             <Copy />
           </Button>
         </div>
-        <span>Ela não será exibida novamente. O usuário deverá trocá-la no primeiro acesso.</span>
+        <span>
+          Ela não será exibida novamente. Entregue-a à pessoa por um canal seguro. Não entre com esta
+          conta: a TI não acessa lançamentos. A pessoa será obrigada a trocar a senha no primeiro acesso.
+        </span>
       </AlertDescription>
     </Alert>
   );

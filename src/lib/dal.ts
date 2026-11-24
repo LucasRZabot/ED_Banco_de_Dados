@@ -23,11 +23,14 @@ export const getCurrentUser = cache(async () => {
       role: true,
       active: true,
       mustChangePassword: true,
+      sessionVersion: true,
       sectorId: true,
       sector: { select: { id: true, name: true, costCenter: true } },
     },
   });
   if (!user || !user.active) return null;
+  // Reset de senha pela TI invalida o JWT antigo daquela conta; a sessão da TI não muda.
+  if ((session.user.sessionVersion ?? 0) !== user.sessionVersion) return null;
   return user;
 });
 

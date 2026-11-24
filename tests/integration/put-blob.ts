@@ -18,6 +18,7 @@ export async function uploadBlob(opts: {
     data: opts.data,
     fileType,
     fileSize: opts.data.length,
+    category: opts.category,
   });
   const token = createUploadToken(
     {

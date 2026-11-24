@@ -29,13 +29,27 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await db.user.findUnique({
           where: { email: parsed.data.email },
-          select: { id: true, name: true, email: true, role: true, active: true, passwordHash: true },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            active: true,
+            passwordHash: true,
+            sessionVersion: true,
+          },
         });
         const ok = await verifyPassword(parsed.data.password, user?.passwordHash);
         if (!user || !ok || !user.active) throw new InvalidLogin();
 
         await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-        return { id: user.id, name: user.name, email: user.email, role: user.role };
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          sessionVersion: user.sessionVersion,
+        };
       },
     }),
   ],

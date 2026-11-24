@@ -9,6 +9,7 @@ import {
   canUploadCategory,
   isAllowedMime,
 } from "@/lib/storage-keys";
+import { MAX_UPLOAD_BYTES, sanitizeOriginalName, sniffedMime } from "@/lib/upload-guard";
 import { createUploadToken } from "@/lib/upload-token";
 
 const TOKEN_TTL_SECONDS = 60 * 60;
@@ -25,7 +26,7 @@ function mimeFromFile(file: File) {
   if (name.endsWith(".png")) return "image/png";
   if (name.endsWith(".jpg") || name.endsWith(".jpeg")) return "image/jpeg";
   if (name.endsWith(".xml")) return "application/xml";
-  return file.type;
+  return "";
 }
 
 export async function POST(request: Request) {
@@ -51,19 +52,34 @@ export async function POST(request: Request) {
   }
 
   const { category, referenceDate } = parsed.data;
-  const fileName = file.name.trim().slice(0, 200) || "arquivo";
-  const fileType = mimeFromFile(file);
-  const fileSize = file.size;
+  const fileName = sanitizeOriginalName(file.name);
+  const claimedType = mimeFromFile(file);
   const e = env();
+  const maxBytes = Math.min(e.UPLOAD_MAX_SIZE_MB * 1024 * 1024, MAX_UPLOAD_BYTES);
 
   if (!canUploadCategory(user.role, category)) {
     return Response.json({ error: "Sem permissão para este tipo de anexo." }, { status: 403 });
   }
-  if (!isAllowedMime(category, fileType)) {
+  if (!claimedType || !isAllowedMime(category, claimedType)) {
     return Response.json({ error: "Tipo de arquivo não permitido." }, { status: 415 });
   }
-  if (fileSize > e.UPLOAD_MAX_SIZE_MB * 1024 * 1024) {
-    return Response.json({ error: `Arquivo acima de ${e.UPLOAD_MAX_SIZE_MB} MB.` }, { status: 413 });
+  if (file.size < 1 || file.size > maxBytes) {
+    return Response.json(
+      { error: file.size < 1 ? "Arquivo vazio." : `Arquivo acima de ${e.UPLOAD_MAX_SIZE_MB} MB.` },
+      { status: file.size < 1 ? 400 : 413 },
+    );
+  }
+
+  const data = Buffer.from(await file.arrayBuffer());
+  if (data.length < 1 || data.length > maxBytes) {
+    return Response.json(
+      { error: data.length < 1 ? "Arquivo vazio." : `Arquivo acima de ${e.UPLOAD_MAX_SIZE_MB} MB.` },
+      { status: data.length < 1 ? 400 : 413 },
+    );
+  }
+  const fileType = sniffedMime(data, claimedType);
+  if (!fileType || !isAllowedMime(category, fileType)) {
+    return Response.json({ error: "Conteúdo do arquivo não confere com o tipo permitido." }, { status: 415 });
   }
 
   const fileKey = buildFileKey({
@@ -72,8 +88,7 @@ export async function POST(request: Request) {
     referenceDate: referenceDate ? new Date(`${referenceDate}T12:00:00Z`) : undefined,
     timeZone: e.APP_TIMEZONE,
   });
-  const data = Buffer.from(await file.arrayBuffer());
-  await putFileBlob({ fileKey, data, fileType, fileSize });
+  await putFileBlob({ fileKey, data, fileType, fileSize: data.length, category });
   const uploadToken = createUploadToken(
     {
       key: fileKey,
@@ -81,7 +96,7 @@ export async function POST(request: Request) {
       category,
       fileName,
       fileType,
-      fileSize,
+      fileSize: data.length,
       exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
     },
     e.AUTH_SECRET,

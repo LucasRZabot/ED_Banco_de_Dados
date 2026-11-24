@@ -1,12 +1,18 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { isSafeFileKey } from "@/lib/upload-guard";
+import type { AttachmentCategoryKey } from "@/lib/storage-keys";
 
 export async function putFileBlob(opts: {
   fileKey: string;
   data: Buffer | Uint8Array;
   fileType: string;
   fileSize: number;
+  category: AttachmentCategoryKey;
 }) {
+  if (!isSafeFileKey(opts.fileKey, opts.category)) {
+    throw new Error("Caminho de arquivo inválido.");
+  }
   const data = Buffer.from(opts.data);
   await db.fileBlob.create({
     data: {
