@@ -10,7 +10,7 @@ import { requireFinance, requireRole } from "@/lib/dal";
 import { parseDateOnly } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { parseNfeXml } from "@/lib/nfe-xml";
-import { getObjectText } from "@/lib/s3";
+import { getFileBlobText } from "@/lib/blobs";
 import { verifyUploadToken } from "@/lib/upload-token";
 import { env } from "@/lib/env";
 import { completeLinkedTicket } from "@/features/tickets/complete";
@@ -71,10 +71,10 @@ async function xmlHintFromTokens(tokens: string[]) {
     const claims = verifyUploadToken(token, env().AUTH_SECRET);
     if (!claims || claims.category !== "INVOICE_XML") continue;
     try {
-      const parsed = parseNfeXml(await getObjectText(claims.key));
+      const parsed = parseNfeXml(await getFileBlobText(claims.key));
       if (parsed.ok) return parsed.data;
     } catch {
-      /* arquivo ainda vai ser validado no HeadObject do attach */
+      /* arquivo ainda vai ser validado no head do blob no attach */
     }
   }
   return null;

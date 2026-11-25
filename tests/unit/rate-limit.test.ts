@@ -13,9 +13,11 @@ describe("rate limiter", () => {
     expect(limiter.take("a", t0 + 1001)).toBe(true);
   });
 
-  it("lê o IP de X-Forwarded-For", () => {
-    const h = new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
-    expect(clientKeyFromHeaders(h)).toBe("203.0.113.9");
+  it("ignora X-Forwarded-For e só aceita x-real-ip sem lista", () => {
+    const spoofed = new Headers({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
+    expect(clientKeyFromHeaders(spoofed)).toBe("unknown");
+    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": "10.0.0.9" }))).toBe("10.0.0.9");
+    expect(clientKeyFromHeaders(new Headers({ "x-real-ip": "1.1.1.1, 2.2.2.2" }))).toBe("unknown");
     expect(clientKeyFromHeaders(new Headers())).toBe("unknown");
   });
 });

@@ -107,6 +107,7 @@ model User {
   role          Role      @default(REQUESTER)
   active        Boolean   @default(true)
   mustChangePassword Boolean @default(true) // senha provisória definida pelo ADMIN
+  sessionVersion Int      @default(0) // incrementa no reset de senha; invalida JWT antigo
   sectorId      String? // obrigatório para REQUESTER (chefia do setor) — CHECK na migration
   lastLoginAt   DateTime?
   createdAt     DateTime  @default(now())
@@ -452,11 +453,26 @@ model Contract {
 
 // ───────────────────────────── Anexos ─────────────────────────────
 
+model FileBlob {
+  fileKey      String    @id // mesma key gerada em storage-keys (nunca o nome original)
+  data         Bytes
+  fileType     String
+  fileSize     Int
+  uploadedById String? // quem enviou; quota de pendentes por usuário
+  expiresAt    DateTime? // pendente até anexar a um registro; depois fica nulo
+  attachedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@index([uploadedById, attachedAt])
+  @@map("file_blobs")
+}
+
 model Attachment {
   id           String             @id @default(cuid())
   fileKey      String             @unique // ex.: notas-fiscais/2026/11/<uuid>.pdf
   fileName     String // nome original (exibição/download)
-  fileType     String // MIME validado no presign
+  fileType     String // MIME validado no upload autenticado
   fileSize     Int // bytes
   category     AttachmentCategory
   uploadedById String

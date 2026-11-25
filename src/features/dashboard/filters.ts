@@ -88,8 +88,9 @@ export function relevantLists(status?: DashboardStatus): Set<DashboardListKind> 
 }
 
 export function csvCell(value: string) {
-  const s = value.replaceAll('"', '""');
-  if (/[;"\r\n]/.test(s)) return `"${s}"`;
+  let s = value.replaceAll('"', '""');
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (/[;"\r\n]/.test(s) || s.startsWith("'")) return `"${s}"`;
   return s;
 }
 

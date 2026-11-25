@@ -1,12 +1,12 @@
+import { pingFileStorage } from "@/lib/blobs";
 import { db } from "@/lib/db";
-import { headBucket } from "@/lib/s3";
 
 export type HealthCheck = "ok" | "error";
 
 export type HealthSnapshot = {
   ok: boolean;
   status: "ok" | "degraded" | "error";
-  checks: { db: HealthCheck; s3?: HealthCheck };
+  checks: { db: HealthCheck; storage?: HealthCheck };
   timezone: string;
   time: string;
 };
@@ -25,10 +25,10 @@ export async function getHealthSnapshot(opts: { deep?: boolean } = {}): Promise<
 
   if (opts.deep) {
     try {
-      await headBucket();
-      checks.s3 = "ok";
+      await pingFileStorage();
+      checks.storage = "ok";
     } catch {
-      checks.s3 = "error";
+      checks.storage = "error";
     }
   }
 

@@ -5,7 +5,7 @@ import { canViewInvoice } from "@/lib/access";
 import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
 import { parseNfeXml } from "@/lib/nfe-xml";
-import { getObjectText } from "@/lib/s3";
+import { getFileBlobText } from "@/lib/blobs";
 import type { InvoiceFilters } from "./schemas";
 
 function visibilityWhere(user: CurrentUser): Prisma.InvoiceWhereInput {
@@ -73,7 +73,7 @@ export async function getInvoiceOrNotFound(user: CurrentUser, id: string) {
 
 export async function prefillFromXmlAttachment(fileKey: string) {
   try {
-    const parsed = parseNfeXml(await getObjectText(fileKey));
+    const parsed = parseNfeXml(await getFileBlobText(fileKey));
     return parsed.ok ? parsed.data : null;
   } catch {
     return null;

@@ -1,10 +1,10 @@
 import "server-only";
 import type { Prisma } from "@/generated/prisma/client";
 import { canViewOwnSubmission } from "@/lib/access";
+import { headFileBlob, markBlobAttached } from "@/lib/blobs";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/dal";
 import { env } from "@/lib/env";
-import { headObject } from "@/lib/s3";
 import { keyMatchesCategory, type AttachmentCategoryKey } from "@/lib/storage-keys";
 import { verifyUploadToken } from "@/lib/upload-token";
 
@@ -19,7 +19,7 @@ export type AttachmentOwner =
 export class AttachmentError extends Error {}
 
 /**
- * Converte um upload já enviado ao S3 em registro `Attachment`.
+ * Converte um upload já gravado em `file_blobs` em registro `Attachment`.
  * Chamada pelas server actions dos módulos (chamados, NFs, boletos...) ao salvar a entidade dona.
  */
 export async function attachUploadedFile(
@@ -35,7 +35,7 @@ export async function attachUploadedFile(
   if (expected && !expected.includes(claims.category)) throw new AttachmentError("Categoria de anexo inválida.");
   if (!keyMatchesCategory(claims.key, claims.category)) throw new AttachmentError("Caminho do arquivo inválido.");
 
-  const head = await headObject(claims.key);
+  const head = await headFileBlob(claims.key);
   if (!head) throw new AttachmentError("Arquivo não encontrado no armazenamento. Envie novamente.");
   if (head.size !== claims.fileSize || head.size > env().UPLOAD_MAX_SIZE_MB * 1024 * 1024) {
     throw new AttachmentError("Tamanho do arquivo não confere com o declarado.");
@@ -45,7 +45,7 @@ export async function attachUploadedFile(
   }
 
   // `fileKey` é único: o mesmo token não gera dois anexos.
-  return tx.attachment.create({
+  const attachment = await tx.attachment.create({
     data: {
       fileKey: claims.key,
       fileName: claims.fileName,
@@ -56,6 +56,8 @@ export async function attachUploadedFile(
       ...owner,
     },
   });
+  await markBlobAttached(claims.key, tx);
+  return attachment;
 }
 
 /** FINANCEIRO vê qualquer anexo; a chefia só os que ela mesma enviou; ADMIN nenhum. */

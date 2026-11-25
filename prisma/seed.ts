@@ -17,7 +17,7 @@ const SECTORS = [
 
 function required(name: string) {
   const v = process.env[name];
-  if (!v) throw new Error(`Defina ${name} no .env para rodar o seed.`);
+  if (!v) throw new Error(`Defina ${name} no .env para rodar o seed (somente desenvolvimento).`);
   return v;
 }
 

@@ -4,13 +4,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getQuoteOrNotFound, listQuotes } from "@/features/quotes/queries";
 import { completeLinkedTicket } from "@/features/tickets/complete";
 import { attachUploadedFile } from "@/lib/attachments";
+import { getFileBlob } from "@/lib/blobs";
 import type { CurrentUser } from "@/lib/dal";
 import { db } from "@/lib/db";
-import { env } from "@/lib/env";
-import { presignDownload, presignUpload } from "@/lib/s3";
-import { buildFileKey } from "@/lib/storage-keys";
-import { createUploadToken } from "@/lib/upload-token";
 import { cnpjFromBase } from "@/lib/validators/cnpj";
+import { uploadBlob } from "./put-blob";
 
 const run = randomUUID().slice(0, 8);
 const pdf = Buffer.from(`%PDF-1.4\n% orcamento ${run}\n%%EOF\n`);
@@ -40,23 +38,7 @@ async function makeUser(role: "ADMIN" | "FINANCEIRO" | "REQUESTER", sectorId: st
 }
 
 async function uploadQuotePdf(userId: string) {
-  const key = buildFileKey({ category: "QUOTE", mimeType: "application/pdf", timeZone: env().APP_TIMEZONE });
-  const url = await presignUpload(key, "application/pdf");
-  const put = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: pdf });
-  expect(put.ok).toBe(true);
-  const token = createUploadToken(
-    {
-      key,
-      userId,
-      category: "QUOTE",
-      fileName: "proposta.pdf",
-      fileType: "application/pdf",
-      fileSize: pdf.length,
-      exp: Math.floor(Date.now() / 1000) + 600,
-    },
-    env().AUTH_SECRET,
-  );
-  return { key, token };
+  return uploadBlob({ userId, category: "QUOTE", data: pdf, fileName: "proposta.pdf" });
 }
 
 beforeAll(async () => {
@@ -151,18 +133,15 @@ describe("visibilidade de orçamentos", () => {
 });
 
 describe("anexo PDF no prefixo orcamentos/", () => {
-  it("grava a key, o financeiro abre com presigned GET inline", async () => {
+  it("grava a key e o blob privado no Postgres", async () => {
     const { key, token } = await uploadQuotePdf(financeiro.id);
     const att = await attachUploadedFile(token, financeiro, { quoteId: quoteCheap }, ["QUOTE"]);
     expect(att.fileKey).toBe(key);
     expect(key).toMatch(/^orcamentos\/[0-9a-f-]{36}\.pdf$/);
 
-    const inlineUrl = await presignDownload(att.fileKey, att.fileName, att.fileType);
-    expect(decodeURIComponent(inlineUrl)).toMatch(/response-content-disposition=inline;/);
-    const res = await fetch(inlineUrl);
-    expect(res.ok).toBe(true);
-    expect(res.headers.get("content-disposition")).toMatch(/^inline;/);
-    expect(Buffer.from(await res.arrayBuffer()).equals(pdf)).toBe(true);
+    const blob = await getFileBlob(att.fileKey);
+    expect(blob).toBeTruthy();
+    expect(Buffer.from(blob!.data).equals(pdf)).toBe(true);
   });
 });
 

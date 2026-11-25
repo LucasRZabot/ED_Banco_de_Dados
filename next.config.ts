@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   partialPrefetching: true,
   poweredByHeader: false,
   output: "standalone",
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "20mb",
+    },
+  },
   async headers() {
     return [
       {

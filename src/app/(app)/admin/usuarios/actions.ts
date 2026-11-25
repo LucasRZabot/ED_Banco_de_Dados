@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@/generated/prisma/client";
 import { requireAdmin } from "@/lib/dal";
 import { db } from "@/lib/db";
+import { log } from "@/lib/log";
 import { generateTemporaryPassword, hashPassword } from "@/lib/password";
 import { ROLES } from "@/lib/roles";
 
@@ -114,13 +115,20 @@ export async function setUserActive(id: string, active: boolean): Promise<UserFo
 }
 
 export async function resetUserPassword(id: string): Promise<UserFormState> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const temporaryPassword = generateTemporaryPassword();
   const user = await db.user.update({
     where: { id },
-    data: { passwordHash: await hashPassword(temporaryPassword), mustChangePassword: true },
-    select: { email: true },
+    data: {
+      passwordHash: await hashPassword(temporaryPassword),
+      mustChangePassword: true,
+      sessionVersion: { increment: 1 },
+    },
+    select: { id: true, email: true },
   });
+  await db.session.deleteMany({ where: { userId: user.id } });
+  // A sessão atual continua sendo a da TI. Não chama signIn da conta redefinida.
+  log.info("admin.password_reset", { actorId: admin.id, targetId: user.id });
   revalidatePath("/admin/usuarios");
   return { ok: true, temporaryPassword, email: user.email };
 }
