@@ -11,7 +11,8 @@ describe("segredos de auth", () => {
     const blob = [envSrc, authHost, example, readme, deploy].join("\n");
 
     expect(envSrc).not.toMatch(/localAuthSecret|dev-only-not-for-production/);
-    expect(authHost).toMatch(/AUTH_SECRET ausente/);
+    expect(envSrc).toMatch(/AUTH_SECRET: z\.string\(\)\.min\(32/);
+    expect(authHost).not.toMatch(/throw new Error/);
     expect(blob).not.toMatch(/Admin@123456|Financeiro@123456|Chefia@123456/);
     expect(example).toMatch(/^AUTH_SECRET=$/m);
     expect(example).toMatch(/^CRON_SECRET=$/m);
