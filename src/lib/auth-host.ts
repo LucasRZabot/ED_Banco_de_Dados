@@ -1,10 +1,6 @@
 process.env.AUTH_TRUST_HOST ??= "true";
 
-if (process.env.NODE_ENV === "production") {
-  const secret = process.env.AUTH_SECRET?.trim() ?? "";
-  if (secret.length < 32) {
-    throw new Error("AUTH_SECRET ausente ou curto demais. O app não inicia sem ele.");
-  }
-}
-
+// AUTH_SECRET is required at runtime (`env()` / Auth.js). Do not throw here:
+// `next build` imports this module while collecting page data, and the host
+// may not inject secrets until the app starts.
 export {};
